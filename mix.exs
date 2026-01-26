@@ -54,6 +54,8 @@ defmodule RustyXML.MixProject do
         mix.exs
         README.md
         LICENSE
+        CHANGELOG.md
+        docs
       )
     ]
   end
@@ -68,7 +70,13 @@ defmodule RustyXML.MixProject do
       extras: [
         "README.md": [title: "Overview"],
         "CHANGELOG.md": [title: "Changelog"],
+        "docs/ARCHITECTURE.md": [title: "Architecture"],
+        "docs/BENCHMARK.md": [title: "Benchmarks"],
+        "docs/COMPLIANCE.md": [title: "XML Compliance"],
         LICENSE: [title: "License"]
+      ],
+      groups_for_extras: [
+        Guides: ~r/docs\/.*/
       ],
       groups_for_modules: [
         Core: [
