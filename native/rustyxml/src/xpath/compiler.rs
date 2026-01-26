@@ -211,29 +211,34 @@ impl CompiledExpr {
     }
 }
 
+/// Cache capacity - guaranteed non-zero at compile time
+const CACHE_CAPACITY_NONZERO: NonZeroUsize = match NonZeroUsize::new(CACHE_CAPACITY) {
+    Some(n) => n,
+    None => panic!("CACHE_CAPACITY must be non-zero"),
+};
+
 /// Compile an XPath expression string (with caching)
 pub fn compile(xpath: &str) -> Result<CompiledExpr, String> {
     // Try to get from cache first
-    {
-        let mut guard = XPATH_CACHE.lock().unwrap();
+    if let Ok(mut guard) = XPATH_CACHE.lock() {
         let cache = guard.get_or_insert_with(|| {
-            LruCache::new(NonZeroUsize::new(CACHE_CAPACITY).unwrap())
+            LruCache::new(CACHE_CAPACITY_NONZERO)
         });
 
         if let Some(compiled) = cache.get(xpath) {
             return Ok(compiled.clone());
         }
     }
+    // If mutex is poisoned, just skip the cache and compile directly
 
     // Not in cache - parse and compile
     let expr = super::parser::parse(xpath)?;
     let compiled = CompiledExpr::compile(&expr);
 
-    // Store in cache
-    {
-        let mut guard = XPATH_CACHE.lock().unwrap();
+    // Store in cache (if mutex is available)
+    if let Ok(mut guard) = XPATH_CACHE.lock() {
         let cache = guard.get_or_insert_with(|| {
-            LruCache::new(NonZeroUsize::new(CACHE_CAPACITY).unwrap())
+            LruCache::new(CACHE_CAPACITY_NONZERO)
         });
         cache.put(xpath.to_string(), compiled.clone());
     }

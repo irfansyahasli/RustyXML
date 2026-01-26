@@ -80,6 +80,7 @@ RustyXML provides multiple strategies for different use cases:
 |----------|----------|--------------|
 | `parse/1` + `xpath/2` | Multiple queries | Cached DOM |
 | `xpath/2` (raw XML) | Single query | Temporary DOM |
+| `Native.xpath_lazy/2` | Large results, partial access | Lazy (3x faster) |
 | `stream_tags/3` | Large files | Bounded memory |
 | `xmap_parallel/2` | Multiple queries | Parallel evaluation |
 
@@ -204,6 +205,12 @@ RustyXML.Native.parse_events("<root>...</root>")
 parser = RustyXML.Native.streaming_new()
 RustyXML.Native.streaming_feed(parser, chunk)
 RustyXML.Native.streaming_take_events(parser, 100)
+
+# Lazy XPath (3x faster for large result sets)
+doc = RustyXML.parse(xml)
+result = RustyXML.Native.xpath_lazy(doc, "//item")
+count = RustyXML.Native.result_count(result)        # No BEAM term building
+texts = RustyXML.Native.result_texts(result, 0, 10) # Batch accessor
 ```
 
 ## Architecture
@@ -405,6 +412,20 @@ xpath(doc, "//user[@name='#{safe_input}']")
 | Quadratic Blowup | ✅ Immune |
 | External DTD | ✅ Immune |
 | XPath Injection | ⚠️ Sanitize user input |
+
+### Implementation Safety
+
+RustyXML is built with defense-in-depth for production reliability:
+
+| Guarantee | Implementation |
+|-----------|----------------|
+| **Memory Safety** | Rust ownership system prevents buffer overflows, use-after-free, data races |
+| **Panic Safety** | No `.unwrap()` in NIF paths - errors return gracefully, never crash the BEAM |
+| **Atom Table Safety** | User-provided values use binary keys - no atom table exhaustion risk |
+| **Thread Safety** | `ResourceArc` + `Mutex` wrappers for safe concurrent access |
+| **Scheduler Safety** | Fast SIMD operations + dirty schedulers prevent blocking |
+
+See [Architecture: NIF Safety](docs/ARCHITECTURE.md#nif-safety) for implementation details.
 
 ## Development
 

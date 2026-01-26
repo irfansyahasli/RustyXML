@@ -12,6 +12,21 @@
 
 use rustler::{Binary, Encoder, Env, NifResult, ResourceArc, Term};
 
+// ============================================================================
+// Pre-defined Atoms (panic-safe)
+// ============================================================================
+
+mod atoms {
+    rustler::atoms! {
+        ok,
+        error,
+        nil,
+        text,
+        name,
+        mutex_poisoned,
+    }
+}
+
 mod core;
 mod dom;
 mod reader;
@@ -206,12 +221,10 @@ fn parse_strict<'a>(env: Env<'a>, input: Binary<'a>) -> NifResult<Term<'a>> {
         Ok(doc) => {
             let resource = DocumentResource::from_owned(doc);
             let arc = ResourceArc::new(resource);
-            let ok_atom = rustler::types::atom::Atom::from_str(env, "ok").unwrap();
-            Ok((ok_atom, arc).encode(env))
+            Ok((atoms::ok(), arc).encode(env))
         }
         Err(msg) => {
-            let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-            Ok((error_atom, msg).encode(env))
+            Ok((atoms::error(), msg).encode(env))
         }
     }
 }
@@ -224,18 +237,14 @@ fn xpath_query<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> NifRe
         match evaluate(&view, xpath_str) {
             Ok(value) => xpath_value_to_term(env, value, &view),
             Err(e) => {
-                let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-                (error_atom, e).encode(env)
+                (atoms::error(), e).encode(env)
             }
         }
     });
 
     match result {
         Some(term) => Ok(term),
-        None => {
-            let nil = rustler::types::atom::nil();
-            Ok(nil.encode(env))
-        }
+        None => Ok(atoms::nil().encode(env)),
     }
 }
 
@@ -257,18 +266,14 @@ fn xpath_query_raw<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> N
                 _ => xpath_value_to_term(env, value, &view),
             },
             Err(e) => {
-                let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-                (error_atom, e).encode(env)
+                (atoms::error(), e).encode(env)
             }
         }
     });
 
     match result {
         Some(term) => Ok(term),
-        None => {
-            let nil = rustler::types::atom::nil();
-            Ok(nil.encode(env))
-        }
+        None => Ok(atoms::nil().encode(env)),
     }
 }
 
@@ -296,10 +301,9 @@ fn xpath_lazy<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> NifRes
             Ok(ResourceArc::new(result).encode(env))
         }
         Some(Err(e)) => {
-            let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-            Ok((error_atom, e).encode(env))
+            Ok((atoms::error(), e).encode(env))
         }
-        None => Ok(rustler::types::atom::nil().encode(env)),
+        None => Ok(atoms::nil().encode(env)),
     }
 }
 
@@ -314,7 +318,7 @@ fn result_count(result_ref: XPathResultRef) -> usize {
 fn result_text<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> NifResult<Term<'a>> {
     let node_id = match result_ref.get_node_id(index) {
         Some(id) => id,
-        None => return Ok(rustler::types::atom::nil().encode(env)),
+        None => return Ok(atoms::nil().encode(env)),
     };
 
     let text = result_ref.doc.with_view(|view| {
@@ -341,7 +345,7 @@ fn result_text<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> Ni
 
     match text {
         Some(Some(s)) => Ok(s.encode(env)),
-        _ => Ok(rustler::types::atom::nil().encode(env)),
+        _ => Ok(atoms::nil().encode(env)),
     }
 }
 
@@ -374,7 +378,7 @@ fn collect_text<D: crate::dom::DocumentAccess>(doc: &D, node_id: crate::dom::Nod
 fn result_attr<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize, attr_name: &str) -> NifResult<Term<'a>> {
     let node_id = match result_ref.get_node_id(index) {
         Some(id) => id,
-        None => return Ok(rustler::types::atom::nil().encode(env)),
+        None => return Ok(atoms::nil().encode(env)),
     };
 
     let attr_value = result_ref.doc.with_view(|view| {
@@ -384,7 +388,7 @@ fn result_attr<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize, attr_
 
     match attr_value {
         Some(Some(s)) => Ok(s.encode(env)),
-        _ => Ok(rustler::types::atom::nil().encode(env)),
+        _ => Ok(atoms::nil().encode(env)),
     }
 }
 
@@ -393,7 +397,7 @@ fn result_attr<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize, attr_
 fn result_name<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> NifResult<Term<'a>> {
     let node_id = match result_ref.get_node_id(index) {
         Some(id) => id,
-        None => return Ok(rustler::types::atom::nil().encode(env)),
+        None => return Ok(atoms::nil().encode(env)),
     };
 
     let name = result_ref.doc.with_view(|view| {
@@ -403,7 +407,7 @@ fn result_name<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> Ni
 
     match name {
         Some(Some(s)) => Ok(s.encode(env)),
-        _ => Ok(rustler::types::atom::nil().encode(env)),
+        _ => Ok(atoms::nil().encode(env)),
     }
 }
 
@@ -412,7 +416,7 @@ fn result_name<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> Ni
 fn result_node<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> NifResult<Term<'a>> {
     let node_id = match result_ref.get_node_id(index) {
         Some(id) => id,
-        None => return Ok(rustler::types::atom::nil().encode(env)),
+        None => return Ok(atoms::nil().encode(env)),
     };
 
     let term = result_ref.doc.with_view(|view| {
@@ -421,7 +425,173 @@ fn result_node<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> Ni
 
     match term {
         Some(t) => Ok(t),
-        None => Ok(rustler::types::atom::nil().encode(env)),
+        None => Ok(atoms::nil().encode(env)),
+    }
+}
+
+// ============================================================================
+// Batch Accessors (reduce NIF call overhead)
+// ============================================================================
+
+/// Get text content for a range of indices (single NIF call)
+#[rustler::nif]
+fn result_texts<'a>(env: Env<'a>, result_ref: XPathResultRef, start: usize, count: usize) -> NifResult<Term<'a>> {
+    let texts = result_ref.doc.with_view(|view| {
+        use crate::dom::NodeKind;
+
+        let mut results = Vec::with_capacity(count);
+        for i in start..(start + count) {
+            let text = if let Some(node_id) = result_ref.get_node_id(i) {
+                if let Some(node) = view.get_node(node_id) {
+                    match node.kind {
+                        NodeKind::Text | NodeKind::CData => {
+                            view.text_content(node_id).map(|s| s.to_string())
+                        }
+                        NodeKind::Element => {
+                            let mut text = String::new();
+                            collect_text(&view, node_id, &mut text);
+                            if text.is_empty() { None } else { Some(text) }
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            results.push(text);
+        }
+        results
+    });
+
+    match texts {
+        Some(list) => {
+            let mut term_list = Term::list_new_empty(env);
+            for text in list.into_iter().rev() {
+                let term = match text {
+                    Some(s) => s.encode(env),
+                    None => atoms::nil().encode(env),
+                };
+                term_list = term_list.list_prepend(term);
+            }
+            Ok(term_list)
+        }
+        None => Ok(Term::list_new_empty(env)),
+    }
+}
+
+/// Get attribute values for a range of indices (single NIF call)
+#[rustler::nif]
+fn result_attrs<'a>(env: Env<'a>, result_ref: XPathResultRef, attr_name: &str, start: usize, count: usize) -> NifResult<Term<'a>> {
+    let attrs = result_ref.doc.with_view(|view| {
+        use crate::dom::DocumentAccess;
+
+        let mut results = Vec::with_capacity(count);
+        for i in start..(start + count) {
+            let attr = if let Some(node_id) = result_ref.get_node_id(i) {
+                view.get_attribute(node_id, attr_name).map(|s| s.to_string())
+            } else {
+                None
+            };
+            results.push(attr);
+        }
+        results
+    });
+
+    match attrs {
+        Some(list) => {
+            let mut term_list = Term::list_new_empty(env);
+            for attr in list.into_iter().rev() {
+                let term = match attr {
+                    Some(s) => s.encode(env),
+                    None => atoms::nil().encode(env),
+                };
+                term_list = term_list.list_prepend(term);
+            }
+            Ok(term_list)
+        }
+        None => Ok(Term::list_new_empty(env)),
+    }
+}
+
+/// Extract multiple fields from each node in a range (single NIF call)
+/// Returns list of maps: [%{text: "...", name: "...", "attr_name" => "value", ...}]
+/// Note: Attribute keys are binaries (not atoms) to avoid atom table exhaustion
+#[rustler::nif]
+fn result_extract<'a>(
+    env: Env<'a>,
+    result_ref: XPathResultRef,
+    start: usize,
+    count: usize,
+    attr_names: Vec<&str>,
+    include_text: bool,
+) -> NifResult<Term<'a>> {
+    use crate::dom::{DocumentAccess, NodeKind};
+    use rustler::types::map::map_new;
+
+    let results = result_ref.doc.with_view(|view| {
+        let mut list = Vec::with_capacity(count);
+
+        for i in start..(start + count) {
+            if let Some(node_id) = result_ref.get_node_id(i) {
+                let mut map = map_new(env);
+
+                // Add element name (atom key - safe, predefined)
+                if let Some(name) = view.node_name(node_id) {
+                    if let Ok(new_map) = map.map_put(atoms::name().encode(env), name.encode(env)) {
+                        map = new_map;
+                    }
+                }
+
+                // Add text content if requested (atom key - safe, predefined)
+                if include_text {
+                    if let Some(node) = view.get_node(node_id) {
+                        let text = match node.kind {
+                            NodeKind::Text | NodeKind::CData => {
+                                view.text_content(node_id).map(|s| s.to_string())
+                            }
+                            NodeKind::Element => {
+                                let mut text = String::new();
+                                collect_text(&view, node_id, &mut text);
+                                if text.is_empty() { None } else { Some(text) }
+                            }
+                            _ => None,
+                        };
+                        if let Some(t) = text {
+                            if let Ok(new_map) = map.map_put(atoms::text().encode(env), t.encode(env)) {
+                                map = new_map;
+                            }
+                        }
+                    }
+                }
+
+                // Add requested attributes (binary keys - safe, no atom table impact)
+                for attr_name in &attr_names {
+                    if let Some(value) = view.get_attribute(node_id, attr_name) {
+                        // Use binary key instead of atom to avoid atom table exhaustion
+                        let key = (*attr_name).encode(env);
+                        if let Ok(new_map) = map.map_put(key, value.encode(env)) {
+                            map = new_map;
+                        }
+                    }
+                }
+
+                list.push(map);
+            }
+        }
+        list
+    });
+
+    match results {
+        Some(list) => {
+            let mut term_list = Term::list_new_empty(env);
+            for map in list.into_iter().rev() {
+                term_list = term_list.list_prepend(map);
+            }
+            Ok(term_list)
+        }
+        None => Ok(Term::list_new_empty(env)),
     }
 }
 
@@ -434,8 +604,7 @@ fn parse_and_xpath<'a>(env: Env<'a>, input: Binary<'a>, xpath_str: &str) -> NifR
     match evaluate(&doc, xpath_str) {
         Ok(value) => Ok(xpath_value_to_term(env, value, &doc)),
         Err(e) => {
-            let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-            Ok((error_atom, e).encode(env))
+            Ok((atoms::error(), e).encode(env))
         }
     }
 }
@@ -447,13 +616,13 @@ fn get_root<'a>(env: Env<'a>, doc_ref: DocumentRef) -> NifResult<Term<'a>> {
         if let Some(root_id) = view.root_element_id() {
             node_to_term(env, &view, root_id)
         } else {
-            rustler::types::atom::nil().encode(env)
+            atoms::nil().encode(env)
         }
     });
 
     match result {
         Some(term) => Ok(term),
-        None => Ok(rustler::types::atom::nil().encode(env)),
+        None => Ok(atoms::nil().encode(env)),
     }
 }
 
@@ -462,7 +631,8 @@ fn get_root<'a>(env: Env<'a>, doc_ref: DocumentRef) -> NifResult<Term<'a>> {
 // ============================================================================
 
 /// Execute parent XPath and evaluate subspecs for each result node
-/// Returns a list of maps: [%{key1: val1, key2: val2}, ...]
+/// Returns a list of maps: [%{"key1" => val1, "key2" => val2}, ...]
+/// Note: Keys are binaries (not atoms) to avoid atom table exhaustion
 #[rustler::nif]
 fn xpath_with_subspecs<'a>(
     env: Env<'a>,
@@ -479,8 +649,7 @@ fn xpath_with_subspecs<'a>(
     let parent_result = match evaluate(&doc, parent_xpath) {
         Ok(v) => v,
         Err(e) => {
-            let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-            return Ok((error_atom, e).encode(env));
+            return Ok((atoms::error(), e).encode(env));
         }
     };
 
@@ -498,18 +667,20 @@ fn xpath_with_subspecs<'a>(
         let mut map_pairs: Vec<(Term, Term)> = Vec::new();
 
         for (key, subxpath) in &subspecs {
-            let key_atom = rustler::types::atom::Atom::from_str(env, key).unwrap();
+            // Use binary key instead of atom to avoid atom table exhaustion
+            let key_term = (*key).encode(env);
 
             let sub_result = match evaluate_from_node(&doc, node_id, subxpath) {
                 Ok(v) => xpath_value_to_term(env, v, &doc),
-                Err(_) => rustler::types::atom::nil().encode(env),
+                Err(_) => atoms::nil().encode(env),
             };
 
-            map_pairs.push((key_atom.encode(env), sub_result));
+            map_pairs.push((key_term, sub_result));
         }
 
-        let map = Term::map_from_pairs(env, &map_pairs).unwrap();
-        result_list = result_list.list_prepend(map);
+        if let Ok(map) = Term::map_from_pairs(env, &map_pairs) {
+            result_list = result_list.list_prepend(map);
+        }
     }
 
     Ok(result_list)
@@ -548,8 +719,7 @@ fn xpath_string_value<'a>(
             Ok(string_val.encode(env))
         }
         Err(e) => {
-            let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-            Ok((error_atom, e).encode(env))
+            Ok((atoms::error(), e).encode(env))
         }
     }
 }
@@ -583,8 +753,7 @@ fn xpath_string_value_doc<'a>(
                 string_val.encode(env)
             }
             Err(e) => {
-                let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-                (error_atom, e).encode(env)
+                (atoms::error(), e).encode(env)
             }
         }
     });
@@ -664,10 +833,14 @@ fn streaming_new_with_filter(tag: Binary) -> StreamingParserRef {
 
 /// Feed a chunk of data to the streaming parser
 #[rustler::nif]
-fn streaming_feed(parser: StreamingParserRef, chunk: Binary) -> (usize, usize) {
-    let mut inner = parser.inner.lock().unwrap();
-    inner.feed(chunk.as_slice());
-    (inner.available_events(), inner.buffer_size())
+fn streaming_feed<'a>(env: Env<'a>, parser: StreamingParserRef, chunk: Binary) -> NifResult<Term<'a>> {
+    match parser.inner.lock() {
+        Ok(mut inner) => {
+            inner.feed(chunk.as_slice());
+            Ok((inner.available_events(), inner.buffer_size()).encode(env))
+        }
+        Err(_) => Ok((atoms::error(), atoms::mutex_poisoned()).encode(env)),
+    }
 }
 
 /// Take up to `max` events from the streaming parser
@@ -677,9 +850,13 @@ fn streaming_take_events<'a>(
     parser: StreamingParserRef,
     max: usize,
 ) -> NifResult<Term<'a>> {
-    let mut inner = parser.inner.lock().unwrap();
-    let events = inner.take_events(max);
-    Ok(events_to_term(env, events))
+    match parser.inner.lock() {
+        Ok(mut inner) => {
+            let events = inner.take_events(max);
+            Ok(events_to_term(env, events))
+        }
+        Err(_) => Ok(Term::list_new_empty(env)),
+    }
 }
 
 /// Take up to `max` complete elements from the streaming parser
@@ -690,42 +867,54 @@ fn streaming_take_elements<'a>(
     parser: StreamingParserRef,
     max: usize,
 ) -> NifResult<Term<'a>> {
-    let mut inner = parser.inner.lock().unwrap();
-    let elements = inner.take_elements(max);
+    match parser.inner.lock() {
+        Ok(mut inner) => {
+            let elements = inner.take_elements(max);
 
-    // Convert Vec<Vec<u8>> to Elixir list of binaries
-    let mut list = Term::list_new_empty(env);
-    for element in elements.into_iter().rev() {
-        let binary = term::bytes_to_binary(env, &element);
-        list = list.list_prepend(binary);
+            // Convert Vec<Vec<u8>> to Elixir list of binaries
+            let mut list = Term::list_new_empty(env);
+            for element in elements.into_iter().rev() {
+                let binary = term::bytes_to_binary(env, &element);
+                list = list.list_prepend(binary);
+            }
+            Ok(list)
+        }
+        Err(_) => Ok(Term::list_new_empty(env)),
     }
-    Ok(list)
 }
 
 /// Get number of available complete elements
 #[rustler::nif]
-fn streaming_available_elements(parser: StreamingParserRef) -> usize {
-    let inner = parser.inner.lock().unwrap();
-    inner.available_elements()
+fn streaming_available_elements<'a>(env: Env<'a>, parser: StreamingParserRef) -> NifResult<Term<'a>> {
+    match parser.inner.lock() {
+        Ok(inner) => Ok(inner.available_elements().encode(env)),
+        Err(_) => Ok(0usize.encode(env)),
+    }
 }
 
 /// Finalize the streaming parser
 #[rustler::nif]
 fn streaming_finalize<'a>(env: Env<'a>, parser: StreamingParserRef) -> NifResult<Term<'a>> {
-    let mut inner = parser.inner.lock().unwrap();
-    let events = inner.finalize();
-    Ok(events_to_term(env, events))
+    match parser.inner.lock() {
+        Ok(mut inner) => {
+            let events = inner.finalize();
+            Ok(events_to_term(env, events))
+        }
+        Err(_) => Ok(Term::list_new_empty(env)),
+    }
 }
 
 /// Get streaming parser status
 #[rustler::nif]
-fn streaming_status(parser: StreamingParserRef) -> (usize, usize, bool) {
-    let inner = parser.inner.lock().unwrap();
-    (
-        inner.available_events(),
-        inner.buffer_size(),
-        inner.has_pending(),
-    )
+fn streaming_status<'a>(env: Env<'a>, parser: StreamingParserRef) -> NifResult<Term<'a>> {
+    match parser.inner.lock() {
+        Ok(inner) => Ok((
+            inner.available_events(),
+            inner.buffer_size(),
+            inner.has_pending(),
+        ).encode(env)),
+        Err(_) => Ok((0usize, 0usize, false).encode(env)),
+    }
 }
 
 // ============================================================================
@@ -748,8 +937,7 @@ fn xpath_parallel<'a>(
             let term = match result {
                 Ok(value) => xpath_value_to_term(env, value, &view),
                 Err(e) => {
-                    let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
-                    (error_atom, e).encode(env)
+                    (atoms::error(), e).encode(env)
                 }
             };
             list = list.list_prepend(term);

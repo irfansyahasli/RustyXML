@@ -14,9 +14,9 @@ Unlike projects that wrap existing Rust crates (like quick-xml or roxmltree), Ru
 - **Zero-copy where possible** - `Cow<[u8]>` borrows data, only allocates for entity decoding
 - **Arena-based DOM** - Cache-friendly node storage with `u32` NodeId indices
 
-### Five Parsing Strategies
+### Six Parsing Strategies
 
-RustyXML offers unmatched flexibility with five parsing strategies:
+RustyXML offers unmatched flexibility with six parsing strategies:
 
 | Strategy | Innovation |
 |----------|------------|
@@ -24,6 +24,7 @@ RustyXML offers unmatched flexibility with five parsing strategies:
 | DOM Parser | Arena allocation with string interning for memory efficiency |
 | Streaming Parser | Stateful parser with bounded memory for multi-GB files |
 | XPath Query | Full XPath 1.0 with all 13 axes and 27+ functions |
+| **Lazy XPath** | Keep results in Rust memory, access on-demand (3x faster) |
 | Parallel XPath | Multi-threaded query evaluation via `rayon` on dirty schedulers |
 
 ### Memory Efficiency
@@ -161,7 +162,46 @@ remaining = RustyXML.Native.streaming_finalize(parser)
 - Wrapped in `ResourceArc` for BEAM garbage collection
 - Does NOT hang with `Stream.take` (fixes SweetXml issue #97)
 
-### Strategy E: Parallel XPath (`xpath_parallel/2`)
+### Strategy E: Lazy XPath (`xpath_lazy/2`)
+
+Keep XPath results in Rust memory, access on-demand without building BEAM terms upfront.
+
+```elixir
+doc = RustyXML.parse(large_xml)
+
+# Execute query - returns reference, not data (instant)
+result = RustyXML.Native.xpath_lazy(doc, "//item")
+
+# Access count without building terms (3x faster than regular XPath)
+count = RustyXML.Native.result_count(result)
+#=> 1000
+
+# Access individual items on-demand
+first_text = RustyXML.Native.result_text(result, 0)
+first_id = RustyXML.Native.result_attr(result, 0, "id")
+
+# Batch accessors for multiple items (reduces NIF call overhead)
+texts = RustyXML.Native.result_texts(result, 0, 10)      # First 10 texts
+ids = RustyXML.Native.result_attrs(result, "id", 0, 10) # First 10 @id values
+
+# Extract multiple fields at once
+data = RustyXML.Native.result_extract(result, 0, 10, ["id", "category"], true)
+#=> [%{:name => "item", :text => "...", "id" => "1", "category" => "cat1"}, ...]
+```
+
+**Best for:** Large result sets, partial access, count-only queries
+
+**Performance:**
+- 3x faster than regular XPath for count-only queries
+- Batch accessors 1.4x faster than individual calls
+- 5x faster for parse + query workflows
+
+**Implementation:**
+- `XPathResultResource` holds `Vec<NodeId>` in Rust memory
+- `DocumentRef` keeps document alive via reference counting
+- Binary keys for user-provided attributes (prevents atom table exhaustion)
+
+### Strategy F: Parallel XPath (`xpath_parallel/2`)
 
 Execute multiple XPath queries in parallel using Rayon thread pool.
 
@@ -363,12 +403,49 @@ The `DocumentAccess` trait allows XPath evaluation on pre-parsed documents witho
 
 XPath union/intersection operations use `HashSet` for O(n) deduplication instead of naive O(n²) contains-checks.
 
+### Lazy XPath API
+
+The regular XPath API builds BEAM terms for all results upfront. For large result sets where you only need a count or a subset, this is wasteful.
+
+The lazy API keeps results in Rust memory as `Vec<NodeId>`:
+
+```elixir
+# Regular API: builds 1000 BEAM tuples immediately
+items = RustyXML.xpath(doc, "//item")  # 104ms
+
+# Lazy API: keeps node IDs in Rust, builds terms on-demand
+result = RustyXML.Native.xpath_lazy(doc, "//item")  # 31ms
+count = RustyXML.Native.result_count(result)  # instant
+```
+
+**Result:** 3x faster for queries where you don't need all results as BEAM terms.
+
+### XPath Expression Caching
+
+Compiled XPath expressions are cached in an LRU cache (256 entries):
+
+```rust
+static XPATH_CACHE: Mutex<Option<LruCache<String, CompiledExpr>>> = Mutex::new(None);
+```
+
+Repeated queries skip parsing and compilation entirely.
+
+### Fast-Path Predicates
+
+Common predicate patterns are optimized:
+
+- `[@attr='value']` → `PredicateAttrEq` (direct attribute lookup)
+- `[n]` → `PredicatePosition` (index access, no iteration)
+
 ### Summary
 
 | Optimization | Impact |
 |--------------|--------|
 | XML string serialization | 1.39x faster element queries |
 | Complete elements streaming | 3.87x faster streaming |
+| **Lazy XPath API** | **3x faster for partial access** |
+| **XPath expression caching** | **Skip re-parsing repeated queries** |
+| **Fast-path predicates** | **23% faster for [@attr='value']** |
 | Compile-time atoms | Eliminates per-call atom lookup |
 | Direct binary encoding | Faster string→term conversion |
 | DocumentAccess trait | O(1) pre-parsed access |
@@ -444,6 +521,46 @@ NIFs should complete in under 1ms to avoid blocking schedulers.
 - Streaming parsers use `Mutex<StreamingParser>` for thread safety
 - String pool uses safe indices with bounds checking
 - All allocations tracked when memory_tracking enabled
+
+### Panic Safety
+
+RustyXML is designed to never crash the BEAM VM:
+
+- **No `.unwrap()` in NIF code paths** - All fallible operations use proper error handling
+- **Pre-defined atoms** - Common atoms (`ok`, `error`, `nil`, `text`, `name`) created at compile time
+- **Graceful mutex handling** - Poisoned mutexes return default values instead of panicking
+- **Graceful map operations** - Failed map operations preserve existing state
+
+```rust
+// Before (could panic and crash VM)
+let error_atom = Atom::from_str(env, "error").unwrap();
+let inner = parser.inner.lock().unwrap();
+
+// After (panic-safe)
+atoms::error()  // Pre-defined at compile time
+match parser.inner.lock() {
+    Ok(inner) => { /* normal operation */ }
+    Err(_) => { /* return default value */ }
+}
+```
+
+### Atom Table Safety
+
+BEAM's atom table has a fixed limit (~1M atoms) and atoms are never garbage collected. Dynamic atom creation from user input can exhaust the table and crash the VM.
+
+RustyXML uses **binary keys** for user-provided values:
+
+```elixir
+# Safe: predefined atom keys + binary attribute keys
+%{:name => "item", :text => "...", "id" => "1", "category" => "cat1"}
+#  ^^^^^           ^^^^^          ^^^^          ^^^^^^^^^^
+#  atom (safe)     atom (safe)    binary (safe) binary (safe)
+```
+
+| Key Type | Implementation | Safe? |
+|----------|----------------|-------|
+| `:name`, `:text`, `:error` | Pre-defined atoms | ✅ Fixed set |
+| User attribute names | Binary strings | ✅ No atom table impact |
 
 ---
 

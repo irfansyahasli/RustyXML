@@ -234,6 +234,60 @@ defmodule RustyXML.Native do
   @spec result_node(result_ref(), non_neg_integer()) :: term() | nil
   def result_node(_result, _index), do: :erlang.nif_error(:nif_not_loaded)
 
+  # ==========================================================================
+  # Batch Accessors (single NIF call for multiple items)
+  # ==========================================================================
+
+  @doc """
+  Get text content for a range of nodes (single NIF call).
+
+  More efficient than calling `result_text/2` in a loop.
+
+  ## Examples
+
+      result = RustyXML.Native.xpath_lazy(doc, "//item")
+      texts = RustyXML.Native.result_texts(result, 0, 10)  # First 10 texts
+
+  """
+  @spec result_texts(result_ref(), non_neg_integer(), non_neg_integer()) :: [binary() | nil]
+  def result_texts(_result, _start, _count), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Get attribute values for a range of nodes (single NIF call).
+
+  ## Examples
+
+      result = RustyXML.Native.xpath_lazy(doc, "//item")
+      ids = RustyXML.Native.result_attrs(result, "id", 0, 10)  # First 10 @id values
+
+  """
+  @spec result_attrs(result_ref(), binary(), non_neg_integer(), non_neg_integer()) :: [binary() | nil]
+  def result_attrs(_result, _attr_name, _start, _count), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Extract multiple fields from each node in a range (single NIF call).
+
+  Returns a list of maps with the requested fields. Much more efficient
+  than calling individual accessors.
+
+  ## Examples
+
+      result = RustyXML.Native.xpath_lazy(doc, "//item")
+      data = RustyXML.Native.result_extract(result, 0, 10, ["id", "category"], true)
+      #=> [%{name: "item", text: "...", id: "1", category: "cat1"}, ...]
+
+  ## Parameters
+
+      - result: The lazy result reference
+      - start: Starting index
+      - count: Number of items to extract
+      - attr_names: List of attribute names to include
+      - include_text: Whether to include text content
+
+  """
+  @spec result_extract(result_ref(), non_neg_integer(), non_neg_integer(), [binary()], boolean()) :: [map()]
+  def result_extract(_result, _start, _count, _attr_names, _include_text), do: :erlang.nif_error(:nif_not_loaded)
+
   @doc """
   Parse XML and execute an XPath query in one call.
 
