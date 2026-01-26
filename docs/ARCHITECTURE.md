@@ -36,7 +36,8 @@ RustyXML offers unmatched flexibility with five parsing strategies:
 
 ### Validated Correctness
 
-- **180+ tests** covering W3C XML 1.0, XPath 1.0, edge cases, and conformance
+- **1275+ tests** including full W3C/OASIS XML Conformance Test Suite
+- **100% OASIS compliance** - All 1089 conformance tests pass (218 valid + 871 not-wf)
 - **Cross-strategy validation** - All strategies produce consistent output
 - **SweetXml compatibility** - Verified identical behavior for common API patterns
 
@@ -505,11 +506,13 @@ See [BENCHMARK.md](BENCHMARK.md) for detailed performance comparisons.
 
 RustyXML is validated against industry-standard test suites:
 
-- **W3C XML 1.0 (Fifth Edition)** - Lenient parser, accepts all valid XML (218/218 tests)
+- **W3C/OASIS Conformance Suite** - 100% compliance (1089/1089 tests pass)
+  - 218/218 valid document tests ✅
+  - 871/871 not-well-formed tests correctly rejected ✅
+- **W3C XML 1.0 (Fifth Edition)** - Full strict mode validation
 - **XPath 1.0 Specification** - Full axis and function support (13 axes, 27+ functions)
-- **W3C/OASIS Conformance Suite** - 100% of valid document tests pass
 
-**Note**: RustyXML is a lenient parser - it accepts all valid XML correctly but does not reject malformed XML. This is a deliberate trade-off for real-world usability.
+RustyXML defaults to **strict mode** for SweetXml compatibility, with **lenient mode** available for processing third-party XML that may have minor issues.
 
 See [COMPLIANCE.md](COMPLIANCE.md) for full details including test suite instructions.
 

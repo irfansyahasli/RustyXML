@@ -313,20 +313,22 @@ RustyXML is tested against the official [W3C XML Conformance Test Suite](https:/
 
 | Mode | Valid Documents | Not-Well-Formed |
 |------|-----------------|-----------------|
+| **Strict (default)** | 218/218 ✅ (100%) | 871/871 ✅ (100%) |
 | Lenient | 218/218 ✅ (100%) | 0/871 rejected |
-| Strict | 214/218 ✅ (98.2%) | 20/871 rejected |
 
-**Lenient mode** correctly parses all valid XML. **Strict mode** catches common well-formedness errors (invalid names, `--` in comments, `]]>` in text) while accepting valid documents.
+**RustyXML achieves 100% OASIS/W3C conformance** in strict mode — all 1089 applicable tests pass.
 
 To run conformance tests yourself:
 ```bash
-# Download W3C test suite (50MB)
+# Download W3C test suite (~50MB, not included in package)
+./scripts/download-xmlconf.sh
+# Or manually:
 mkdir -p test/xmlconf && cd test/xmlconf
 curl -LO https://www.w3.org/XML/Test/xmlts20130923.tar.gz
 tar -xzf xmlts20130923.tar.gz && rm xmlts20130923.tar.gz
 
 # Run tests
-FORCE_RUSTYXML_BUILD=1 mix test test/oasis_conformance_test.exs --only valid
+mix test test/oasis_conformance_test.exs
 ```
 
 ## Security
