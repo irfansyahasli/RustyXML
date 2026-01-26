@@ -170,6 +170,70 @@ defmodule RustyXML.Native do
   @spec xpath_query_raw(document_ref(), binary()) :: [binary()] | term()
   def xpath_query_raw(_doc, _xpath), do: :erlang.nif_error(:nif_not_loaded)
 
+  # ==========================================================================
+  # Lazy XPath (Zero-copy result sets)
+  # ==========================================================================
+
+  @typedoc "Opaque reference to an XPath result set stored in Rust memory"
+  @type result_ref :: reference()
+
+  @doc """
+  Execute XPath query returning a lazy result set.
+
+  Unlike `xpath_query/2`, this does NOT build BEAM terms for the results.
+  The matched nodes stay in Rust memory and can be accessed on-demand
+  using `result_count/1`, `result_text/2`, `result_attr/3`, etc.
+
+  This is much faster for queries returning many nodes when you only
+  need to access a subset of the data.
+
+  ## Examples
+
+      doc = RustyXML.Native.parse(large_xml)
+      result = RustyXML.Native.xpath_lazy(doc, "//item")
+      count = RustyXML.Native.result_count(result)  # => 10000
+      first_name = RustyXML.Native.result_text(result, 0)  # Only builds 1 term
+
+  """
+  @spec xpath_lazy(document_ref(), binary()) :: result_ref() | {:error, term()}
+  def xpath_lazy(_doc, _xpath), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Get the number of nodes in a lazy result set.
+  """
+  @spec result_count(result_ref()) :: non_neg_integer()
+  def result_count(_result), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Get the text content of a node at the given index.
+
+  For text nodes, returns the text directly.
+  For elements, returns concatenated text of all descendant text nodes.
+  """
+  @spec result_text(result_ref(), non_neg_integer()) :: binary() | nil
+  def result_text(_result, _index), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Get an attribute value from a node at the given index.
+  """
+  @spec result_attr(result_ref(), non_neg_integer(), binary()) :: binary() | nil
+  def result_attr(_result, _index, _attr_name), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Get the element name of a node at the given index.
+  """
+  @spec result_name(result_ref(), non_neg_integer()) :: binary() | nil
+  def result_name(_result, _index), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Get the full node at the given index as a BEAM term.
+
+  This builds the full nested structure, so use sparingly.
+  Prefer `result_text/2` and `result_attr/3` for better performance.
+  """
+  @spec result_node(result_ref(), non_neg_integer()) :: term() | nil
+  def result_node(_result, _index), do: :erlang.nif_error(:nif_not_loaded)
+
   @doc """
   Parse XML and execute an XPath query in one call.
 

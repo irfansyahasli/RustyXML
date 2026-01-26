@@ -21,7 +21,7 @@ mod term;
 mod xpath;
 
 use dom::XmlDocument;
-use resource::{StreamingParserResource, StreamingParserRef, DocumentResource, DocumentRef};
+use resource::{StreamingParserResource, StreamingParserRef, DocumentResource, DocumentRef, XPathResultResource, XPathResultRef};
 use term::{xpath_value_to_term, events_to_term, node_to_term};
 use xpath::evaluate;
 
@@ -269,6 +269,159 @@ fn xpath_query_raw<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> N
             let nil = rustler::types::atom::nil();
             Ok(nil.encode(env))
         }
+    }
+}
+
+// ============================================================================
+// Lazy XPath (Zero-copy result sets)
+// ============================================================================
+
+/// Execute XPath query returning a lazy result set (no BEAM term building)
+/// The result stays in Rust memory until explicitly accessed
+#[rustler::nif]
+fn xpath_lazy<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> NifResult<Term<'a>> {
+    use xpath::XPathValue;
+
+    let nodes = doc_ref.with_view(|view| {
+        match evaluate(&view, xpath_str) {
+            Ok(XPathValue::NodeSet(nodes)) => Ok(nodes),
+            Ok(_) => Err("xpath_lazy only supports queries returning node sets".to_string()),
+            Err(e) => Err(e),
+        }
+    });
+
+    match nodes {
+        Some(Ok(node_ids)) => {
+            let result = XPathResultResource::new(doc_ref.clone(), node_ids);
+            Ok(ResourceArc::new(result).encode(env))
+        }
+        Some(Err(e)) => {
+            let error_atom = rustler::types::atom::Atom::from_str(env, "error").unwrap();
+            Ok((error_atom, e).encode(env))
+        }
+        None => Ok(rustler::types::atom::nil().encode(env)),
+    }
+}
+
+/// Get the count of results in a lazy result set
+#[rustler::nif]
+fn result_count(result_ref: XPathResultRef) -> usize {
+    result_ref.count()
+}
+
+/// Get text content of a node at index in the result set
+#[rustler::nif]
+fn result_text<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> NifResult<Term<'a>> {
+    let node_id = match result_ref.get_node_id(index) {
+        Some(id) => id,
+        None => return Ok(rustler::types::atom::nil().encode(env)),
+    };
+
+    let text = result_ref.doc.with_view(|view| {
+        use crate::dom::{DocumentAccess, NodeKind};
+
+        // Get text content - either direct text node or concatenated child text
+        if let Some(node) = view.get_node(node_id) {
+            match node.kind {
+                NodeKind::Text | NodeKind::CData => {
+                    view.text_content(node_id).map(|s| s.to_string())
+                }
+                NodeKind::Element => {
+                    // Concatenate all descendant text
+                    let mut text = String::new();
+                    collect_text(&view, node_id, &mut text);
+                    if text.is_empty() { None } else { Some(text) }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    });
+
+    match text {
+        Some(Some(s)) => Ok(s.encode(env)),
+        _ => Ok(rustler::types::atom::nil().encode(env)),
+    }
+}
+
+/// Helper to collect text from all descendants
+fn collect_text<D: crate::dom::DocumentAccess>(doc: &D, node_id: crate::dom::NodeId, buf: &mut String) {
+    use crate::dom::NodeKind;
+
+    if let Some(node) = doc.get_node(node_id) {
+        match node.kind {
+            NodeKind::Text | NodeKind::CData => {
+                if let Some(text) = doc.text_content(node_id) {
+                    buf.push_str(text);
+                }
+            }
+            NodeKind::Element => {
+                // Recurse into children
+                let mut child_id = node.first_child;
+                while let Some(cid) = child_id {
+                    collect_text(doc, cid, buf);
+                    child_id = doc.get_node(cid).and_then(|n| n.next_sibling);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Get an attribute value from a node at index in the result set
+#[rustler::nif]
+fn result_attr<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize, attr_name: &str) -> NifResult<Term<'a>> {
+    let node_id = match result_ref.get_node_id(index) {
+        Some(id) => id,
+        None => return Ok(rustler::types::atom::nil().encode(env)),
+    };
+
+    let attr_value = result_ref.doc.with_view(|view| {
+        use crate::dom::DocumentAccess;
+        view.get_attribute(node_id, attr_name).map(|s| s.to_string())
+    });
+
+    match attr_value {
+        Some(Some(s)) => Ok(s.encode(env)),
+        _ => Ok(rustler::types::atom::nil().encode(env)),
+    }
+}
+
+/// Get the element name of a node at index in the result set
+#[rustler::nif]
+fn result_name<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> NifResult<Term<'a>> {
+    let node_id = match result_ref.get_node_id(index) {
+        Some(id) => id,
+        None => return Ok(rustler::types::atom::nil().encode(env)),
+    };
+
+    let name = result_ref.doc.with_view(|view| {
+        use crate::dom::DocumentAccess;
+        view.node_name(node_id).map(|s| s.to_string())
+    });
+
+    match name {
+        Some(Some(s)) => Ok(s.encode(env)),
+        _ => Ok(rustler::types::atom::nil().encode(env)),
+    }
+}
+
+/// Get full node at index (builds BEAM term - use sparingly)
+#[rustler::nif]
+fn result_node<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> NifResult<Term<'a>> {
+    let node_id = match result_ref.get_node_id(index) {
+        Some(id) => id,
+        None => return Ok(rustler::types::atom::nil().encode(env)),
+    };
+
+    let term = result_ref.doc.with_view(|view| {
+        node_to_term(env, &view, node_id)
+    });
+
+    match term {
+        Some(t) => Ok(t),
+        None => Ok(rustler::types::atom::nil().encode(env)),
     }
 }
 
@@ -618,6 +771,7 @@ fn xpath_parallel<'a>(
 fn load(env: Env, _info: Term) -> bool {
     let _ = rustler::resource!(StreamingParserResource, env);
     let _ = rustler::resource!(DocumentResource, env);
+    let _ = rustler::resource!(XPathResultResource, env);
     true
 }
 

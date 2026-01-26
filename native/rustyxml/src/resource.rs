@@ -107,3 +107,37 @@ impl Default for DocumentResource {
 
 /// Type alias for document ResourceArc
 pub type DocumentRef = ResourceArc<DocumentResource>;
+
+// ============================================================================
+// XPath Result Set Resource (lazy evaluation)
+// ============================================================================
+
+use crate::dom::NodeId;
+
+/// Stores XPath results without converting to BEAM terms
+/// Allows lazy access to specific nodes/attributes
+pub struct XPathResultResource {
+    /// Reference to the source document
+    pub doc: DocumentRef,
+    /// Node IDs of matched nodes (stays in Rust memory)
+    pub nodes: Vec<NodeId>,
+}
+
+impl XPathResultResource {
+    pub fn new(doc: DocumentRef, nodes: Vec<NodeId>) -> Self {
+        XPathResultResource { doc, nodes }
+    }
+
+    /// Get number of results
+    pub fn count(&self) -> usize {
+        self.nodes.len()
+    }
+
+    /// Get node ID at index
+    pub fn get_node_id(&self, index: usize) -> Option<NodeId> {
+        self.nodes.get(index).copied()
+    }
+}
+
+/// Type alias for result set ResourceArc
+pub type XPathResultRef = ResourceArc<XPathResultResource>;
