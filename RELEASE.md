@@ -1,8 +1,8 @@
-# Release Process for RustyCSV
+# Release Process for RustyXML
 
 ## Steps
 
-1. Update version in `mix.exs` and `native/rustycsv/Cargo.toml`
+1. Update version in `mix.exs` and `native/rustyxml/Cargo.toml`
 2. Update `CHANGELOG.md`
 3. Commit: `git commit -am "Bump version to x.y.z"`
 4. Push to main: `git push origin main`
@@ -19,9 +19,9 @@
    ```bash
    gh release edit vx.y.z --draft=false
    ```
-9. Clear checksum and generate new checksums: `rm -f checksum-Elixir.RustyCSV.Native.exs && FORCE_RUSTYCSV_BUILD=1 mix compile && mix rustler_precompiled.download RustyCSV.Native --all --print`
+9. Clear checksum and generate new checksums: `rm -f checksum-Elixir.RustyXML.Native.exs && FORCE_RUSTYXML_BUILD=1 mix compile && mix rustler_precompiled.download RustyXML.Native --all --print`
 
-10. Commit checksums: `git add checksum-Elixir.RustyCSV.Native.exs && git commit -m "Add vx.y.z checksums" && git push`
+10. Commit checksums: `git add checksum-Elixir.RustyXML.Native.exs && git commit -m "Add vx.y.z checksums" && git push`
 
 11. Publish to Hex: `mix hex.publish`
 
