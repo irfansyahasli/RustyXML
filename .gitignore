@@ -44,3 +44,6 @@ Thumbs.db
 /bench/*.csv
 /bench/data/
 /bench/results/
+
+# Local config (force_build, etc.)
+/config/
