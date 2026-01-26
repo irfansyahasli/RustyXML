@@ -12,6 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 rustler = "0.37"
 memchr = "2.7"    # Fast byte searching, uses SIMD when available
+lru = "0.12"      # LRU cache for compiled XPath expressions
 rayon = "1.10"    # Data parallelism for parallel XPath evaluation
 mimalloc = { version = "0.1", default-features = false, optional = true }
 
