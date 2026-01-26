@@ -195,17 +195,15 @@ defmodule OasisConformanceTest do
 
   # Safely attempt to parse, catching any errors
   defp safe_parse(xml) do
-    try do
-      doc = RustyXML.parse(xml)
-      # Verify we can get the root - this forces full parsing
-      _root = RustyXML.root(doc)
-      {:ok, doc}
-    rescue
-      e in [RustyXML.ParseError, ArgumentError, ErlangError] ->
-        {:error, e}
-    catch
-      :error, reason ->
-        {:error, reason}
-    end
+    doc = RustyXML.parse(xml)
+    # Verify we can get the root - this forces full parsing
+    _root = RustyXML.root(doc)
+    {:ok, doc}
+  rescue
+    e in [RustyXML.ParseError, ArgumentError, ErlangError] ->
+      {:error, e}
+  catch
+    :error, reason ->
+      {:error, reason}
   end
 end

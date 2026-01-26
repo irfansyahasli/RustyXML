@@ -48,7 +48,13 @@ impl XPathValue {
                 let s = self.to_string_value();
                 s.trim().parse().unwrap_or(f64::NAN)
             }
-            XPathValue::Boolean(b) => if *b { 1.0 } else { 0.0 },
+            XPathValue::Boolean(b) => {
+                if *b {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
             XPathValue::Number(n) => *n,
             XPathValue::String(s) => s.trim().parse().unwrap_or(f64::NAN),
             XPathValue::StringList(list) => {
@@ -202,6 +208,6 @@ mod tests {
         assert_eq!(XPathValue::Boolean(true).to_string_value(), "true");
         assert_eq!(XPathValue::Boolean(false).to_string_value(), "false");
         assert_eq!(XPathValue::Number(42.0).to_string_value(), "42");
-        assert_eq!(XPathValue::Number(3.14).to_string_value(), "3.14");
+        assert_eq!(XPathValue::Number(3.25).to_string_value(), "3.25");
     }
 }

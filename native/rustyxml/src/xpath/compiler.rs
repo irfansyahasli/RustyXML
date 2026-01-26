@@ -3,10 +3,10 @@
 //! Compiles parsed XPath expressions into an optimized intermediate representation.
 //! Includes an LRU cache for compiled expressions to avoid re-parsing repeated queries.
 
-use super::parser::{Expr, Step, Axis, NodeTest, BinaryOp};
-use std::sync::Mutex;
+use super::parser::{Axis, BinaryOp, Expr, NodeTest, Step};
 use lru::LruCache;
 use std::num::NonZeroUsize;
+use std::sync::Mutex;
 
 /// Global LRU cache for compiled XPath expressions
 /// Using a Mutex for thread-safety across BEAM schedulers
@@ -221,9 +221,7 @@ const CACHE_CAPACITY_NONZERO: NonZeroUsize = match NonZeroUsize::new(CACHE_CAPAC
 pub fn compile(xpath: &str) -> Result<CompiledExpr, String> {
     // Try to get from cache first
     if let Ok(mut guard) = XPATH_CACHE.lock() {
-        let cache = guard.get_or_insert_with(|| {
-            LruCache::new(CACHE_CAPACITY_NONZERO)
-        });
+        let cache = guard.get_or_insert_with(|| LruCache::new(CACHE_CAPACITY_NONZERO));
 
         if let Some(compiled) = cache.get(xpath) {
             return Ok(compiled.clone());
@@ -237,9 +235,7 @@ pub fn compile(xpath: &str) -> Result<CompiledExpr, String> {
 
     // Store in cache (if mutex is available)
     if let Ok(mut guard) = XPATH_CACHE.lock() {
-        let cache = guard.get_or_insert_with(|| {
-            LruCache::new(CACHE_CAPACITY_NONZERO)
-        });
+        let cache = guard.get_or_insert_with(|| LruCache::new(CACHE_CAPACITY_NONZERO));
         cache.put(xpath.to_string(), compiled.clone());
     }
 

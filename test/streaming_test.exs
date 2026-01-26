@@ -32,7 +32,7 @@ defmodule RustyXML.StreamingTest do
       RustyXML.Native.streaming_feed(parser, "<root><item/></root>")
       events = RustyXML.Native.streaming_take_events(parser, 100)
       assert is_list(events)
-      assert length(events) > 0
+      assert events != []
     end
 
     test "streaming_finalize returns remaining events" do

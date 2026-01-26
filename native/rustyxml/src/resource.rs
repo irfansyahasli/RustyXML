@@ -2,8 +2,8 @@
 //!
 //! Persistent state for streaming parsers and DOM documents.
 
+use crate::dom::{OwnedXmlDocument, XmlDocument, XmlDocumentView};
 use crate::strategy::StreamingParser;
-use crate::dom::{XmlDocument, OwnedXmlDocument, XmlDocumentView};
 use rustler::ResourceArc;
 use std::sync::Mutex;
 
@@ -93,7 +93,9 @@ impl DocumentResource {
     /// Get root element name without parsing
     pub fn root_name(&self) -> Option<String> {
         let guard = self.doc.lock().ok()?;
-        guard.as_ref().and_then(|d| d.root_name().map(|s| s.to_string()))
+        guard
+            .as_ref()
+            .and_then(|d| d.root_name().map(|s| s.to_string()))
     }
 }
 

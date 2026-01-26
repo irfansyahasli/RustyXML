@@ -74,7 +74,10 @@ impl<'a> StartElement<'a> {
             }
             Cow::Owned(n) => {
                 if let Some(pos) = memchr::memchr(b':', n) {
-                    (Some(Cow::Owned(n[..pos].to_vec())), Cow::Owned(n[pos + 1..].to_vec()))
+                    (
+                        Some(Cow::Owned(n[..pos].to_vec())),
+                        Cow::Owned(n[pos + 1..].to_vec()),
+                    )
                 } else {
                     (None, Cow::Owned(n.clone()))
                 }
@@ -144,7 +147,10 @@ impl<'a> EndElement<'a> {
             }
             Cow::Owned(n) => {
                 if let Some(pos) = memchr::memchr(b':', n) {
-                    (Some(Cow::Owned(n[..pos].to_vec())), Cow::Owned(n[pos + 1..].to_vec()))
+                    (
+                        Some(Cow::Owned(n[..pos].to_vec())),
+                        Cow::Owned(n[pos + 1..].to_vec()),
+                    )
                 } else {
                     (None, Cow::Owned(n.clone()))
                 }
@@ -230,6 +236,11 @@ mod tests {
         let elem = StartElement::new(b"svg:rect", vec![]);
         assert_eq!(elem.name_str(), Some("svg:rect"));
         assert_eq!(elem.local_name_str(), Some("rect"));
-        assert_eq!(elem.prefix.as_ref().and_then(|p| std::str::from_utf8(p.as_ref()).ok()), Some("svg"));
+        assert_eq!(
+            elem.prefix
+                .as_ref()
+                .and_then(|p| std::str::from_utf8(p.as_ref()).ok()),
+            Some("svg")
+        );
     }
 }

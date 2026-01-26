@@ -2,10 +2,10 @@
 //!
 //! Converts Rust XML structures to Elixir terms.
 
-use rustler::{Encoder, Env, NewBinary, Term};
 use crate::dom::{DocumentAccess, NodeId, NodeKind};
-use crate::xpath::XPathValue;
 use crate::strategy::streaming::OwnedXmlEvent;
+use crate::xpath::XPathValue;
+use rustler::{Encoder, Env, NewBinary, Term};
 
 // Pre-defined atoms for efficiency - created once at compile time
 rustler::atoms! {
@@ -21,7 +21,11 @@ rustler::atoms! {
 }
 
 /// Convert an XPath value to an Elixir term
-pub fn xpath_value_to_term<'a, D: DocumentAccess>(env: Env<'a>, value: XPathValue, doc: &D) -> Term<'a> {
+pub fn xpath_value_to_term<'a, D: DocumentAccess>(
+    env: Env<'a>,
+    value: XPathValue,
+    doc: &D,
+) -> Term<'a> {
     match value {
         XPathValue::NodeSet(nodes) => {
             // Convert node set to list of node terms
@@ -65,7 +69,10 @@ pub fn node_to_term<'a, D: DocumentAccess>(env: Env<'a>, doc: &D, node_id: NodeI
             for attr in attrs_slice.iter().rev() {
                 let attr_name = doc.strings().get_str(attr.name_id).unwrap_or("");
                 let attr_value = doc.strings().get_str(attr.value_id).unwrap_or("");
-                let attr_tuple = (str_to_binary(env, attr_name), str_to_binary(env, attr_value));
+                let attr_tuple = (
+                    str_to_binary(env, attr_name),
+                    str_to_binary(env, attr_value),
+                );
                 attrs = attrs.list_prepend(attr_tuple.encode(env));
             }
 
@@ -101,9 +108,7 @@ pub fn node_to_term<'a, D: DocumentAccess>(env: Env<'a>, doc: &D, node_id: NodeI
                 rustler::types::atom::nil().encode(env)
             }
         }
-        NodeKind::Attribute => {
-            rustler::types::atom::nil().encode(env)
-        }
+        NodeKind::Attribute => rustler::types::atom::nil().encode(env),
     }
 }
 
@@ -155,18 +160,15 @@ pub fn event_to_term<'a>(env: Env<'a>, event: OwnedXmlEvent) -> Term<'a> {
 
             (empty_element(), name_term, attrs).encode(env)
         }
-        OwnedXmlEvent::Text(content) => {
-            (text(), bytes_to_binary(env, &content)).encode(env)
-        }
-        OwnedXmlEvent::CData(content) => {
-            (cdata(), bytes_to_binary(env, &content)).encode(env)
-        }
-        OwnedXmlEvent::Comment(content) => {
-            (comment(), bytes_to_binary(env, &content)).encode(env)
-        }
-        OwnedXmlEvent::ProcessingInstruction { target, data } => {
-            (processing_instruction(), bytes_to_binary(env, &target), bytes_to_binary(env, &data)).encode(env)
-        }
+        OwnedXmlEvent::Text(content) => (text(), bytes_to_binary(env, &content)).encode(env),
+        OwnedXmlEvent::CData(content) => (cdata(), bytes_to_binary(env, &content)).encode(env),
+        OwnedXmlEvent::Comment(content) => (comment(), bytes_to_binary(env, &content)).encode(env),
+        OwnedXmlEvent::ProcessingInstruction { target, data } => (
+            processing_instruction(),
+            bytes_to_binary(env, &target),
+            bytes_to_binary(env, &data),
+        )
+            .encode(env),
     }
 }
 
@@ -179,7 +181,11 @@ pub fn bytes_to_binary<'a>(env: Env<'a>, bytes: &[u8]) -> Term<'a> {
 
 /// Convert an XPath node set to a list of XML binaries (fast path)
 /// Returns each element as its serialized XML string - bypasses BEAM term construction
-pub fn nodeset_to_xml_binaries<'a, D: DocumentAccess>(env: Env<'a>, nodes: &[NodeId], doc: &D) -> Term<'a> {
+pub fn nodeset_to_xml_binaries<'a, D: DocumentAccess>(
+    env: Env<'a>,
+    nodes: &[NodeId],
+    doc: &D,
+) -> Term<'a> {
     let mut list = Term::list_new_empty(env);
     for &id in nodes.iter().rev() {
         let xml = serialize_node_to_xml(doc, id);

@@ -297,7 +297,14 @@ impl<'a> Parser<'a> {
         let mut expr = match &self.current {
             Token::Slash => {
                 self.advance();
-                if matches!(self.current, Token::Eof | Token::RightBracket | Token::RightParen | Token::Pipe | Token::Comma) {
+                if matches!(
+                    self.current,
+                    Token::Eof
+                        | Token::RightBracket
+                        | Token::RightParen
+                        | Token::Pipe
+                        | Token::Comma
+                ) {
                     // Just /
                     return Ok(Expr::Root);
                 } else {
@@ -536,7 +543,8 @@ impl<'a> Parser<'a> {
 
         // Check if there's an explicit axis specification
         if let Token::Axis(axis_name) = &self.current {
-            axis = Axis::from_str(axis_name).ok_or_else(|| format!("Unknown axis: {}", axis_name))?;
+            axis =
+                Axis::from_str(axis_name).ok_or_else(|| format!("Unknown axis: {}", axis_name))?;
             self.advance();
             if !matches!(self.current, Token::DoubleColon) {
                 return Err("Expected :: after axis".to_string());

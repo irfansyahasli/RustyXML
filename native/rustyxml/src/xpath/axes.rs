@@ -8,17 +8,13 @@
 //! - preceding, preceding-sibling
 //! - attribute, namespace
 
-use crate::dom::{DocumentAccess, NodeId, NodeKind};
+use super::parser::Axis;
 #[cfg(test)]
 use crate::dom::XmlDocument;
-use super::parser::Axis;
+use crate::dom::{DocumentAccess, NodeId, NodeKind};
 
 /// Navigate along an axis from a context node
-pub fn navigate<D: DocumentAccess>(
-    doc: &D,
-    context: NodeId,
-    axis: Axis,
-) -> Vec<NodeId> {
+pub fn navigate<D: DocumentAccess>(doc: &D, context: NodeId, axis: Axis) -> Vec<NodeId> {
     match axis {
         Axis::Child => child_axis(doc, context),
         Axis::Descendant => descendant_axis(doc, context),
@@ -171,7 +167,8 @@ fn following_axis<D: DocumentAccess>(doc: &D, context: NodeId) -> Vec<NodeId> {
 /// preceding:: axis - all nodes before in document order (not ancestors)
 fn preceding_axis<D: DocumentAccess>(doc: &D, context: NodeId) -> Vec<NodeId> {
     let mut result = Vec::new();
-    let ancestors: std::collections::HashSet<NodeId> = ancestor_axis(doc, context).into_iter().collect();
+    let ancestors: std::collections::HashSet<NodeId> =
+        ancestor_axis(doc, context).into_iter().collect();
 
     // Collect all nodes in document order that come before context
     // and are not ancestors
@@ -278,12 +275,8 @@ pub fn matches_node_test<D: DocumentAccess>(
             // node() matches any node type
             true
         }
-        CompiledNodeTest::Text => {
-            node.kind == NodeKind::Text || node.kind == NodeKind::CData
-        }
-        CompiledNodeTest::Comment => {
-            node.kind == NodeKind::Comment
-        }
+        CompiledNodeTest::Text => node.kind == NodeKind::Text || node.kind == NodeKind::CData,
+        CompiledNodeTest::Comment => node.kind == NodeKind::Comment,
         CompiledNodeTest::ProcessingInstruction(target) => {
             if node.kind != NodeKind::ProcessingInstruction {
                 return false;
@@ -314,7 +307,7 @@ mod tests {
         let doc = XmlDocument::parse(b"<root><a><b/></a><c/></root>");
         let root = doc.root_element_id().unwrap();
         let descendants = descendant_axis(&doc, root);
-        assert_eq!(descendants.len(), 3);  // a, b, c
+        assert_eq!(descendants.len(), 3); // a, b, c
     }
 
     #[test]
@@ -326,6 +319,6 @@ mod tests {
         let a_children: Vec<_> = doc.children_vec(a);
         let b = a_children[0];
         let ancestors = ancestor_axis(&doc, b);
-        assert_eq!(ancestors.len(), 3);  // a, root, document
+        assert_eq!(ancestors.len(), 3); // a, root, document
     }
 }

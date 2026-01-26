@@ -17,9 +17,9 @@
 //! - number(), sum(), floor(), ceiling(), round()
 
 use super::value::XPathValue;
-use crate::dom::{DocumentAccess, NodeId};
 #[cfg(test)]
 use crate::dom::XmlDocument;
+use crate::dom::{DocumentAccess, NodeId};
 
 /// Evaluate a function call
 pub fn call<D: DocumentAccess>(
@@ -82,7 +82,11 @@ fn fn_count(args: Vec<XPathValue>) -> Result<XPathValue, String> {
     }
 }
 
-fn fn_local_name<D: DocumentAccess>(args: Vec<XPathValue>, doc: &D, context: NodeId) -> Result<XPathValue, String> {
+fn fn_local_name<D: DocumentAccess>(
+    args: Vec<XPathValue>,
+    doc: &D,
+    context: NodeId,
+) -> Result<XPathValue, String> {
     let node = if args.is_empty() {
         context
     } else {
@@ -97,12 +101,20 @@ fn fn_local_name<D: DocumentAccess>(args: Vec<XPathValue>, doc: &D, context: Nod
     Ok(XPathValue::String(name.to_string()))
 }
 
-fn fn_namespace_uri<D: DocumentAccess>(_args: Vec<XPathValue>, _doc: &D, _context: NodeId) -> Result<XPathValue, String> {
+fn fn_namespace_uri<D: DocumentAccess>(
+    _args: Vec<XPathValue>,
+    _doc: &D,
+    _context: NodeId,
+) -> Result<XPathValue, String> {
     // TODO: implement namespace resolution
     Ok(XPathValue::String(String::new()))
 }
 
-fn fn_name<D: DocumentAccess>(args: Vec<XPathValue>, doc: &D, context: NodeId) -> Result<XPathValue, String> {
+fn fn_name<D: DocumentAccess>(
+    args: Vec<XPathValue>,
+    doc: &D,
+    context: NodeId,
+) -> Result<XPathValue, String> {
     let node = if args.is_empty() {
         context
     } else {
@@ -124,7 +136,11 @@ fn fn_id(_args: Vec<XPathValue>) -> Result<XPathValue, String> {
 
 // String Functions
 
-fn fn_string<D: DocumentAccess>(args: Vec<XPathValue>, doc: &D, context: NodeId) -> Result<XPathValue, String> {
+fn fn_string<D: DocumentAccess>(
+    args: Vec<XPathValue>,
+    doc: &D,
+    context: NodeId,
+) -> Result<XPathValue, String> {
     let value = if args.is_empty() {
         // String value of context node
         get_string_value(doc, context)
@@ -226,7 +242,11 @@ fn fn_string_length(args: Vec<XPathValue>) -> Result<XPathValue, String> {
     Ok(XPathValue::Number(s.chars().count() as f64))
 }
 
-fn fn_normalize_space<D: DocumentAccess>(args: Vec<XPathValue>, doc: &D, context: NodeId) -> Result<XPathValue, String> {
+fn fn_normalize_space<D: DocumentAccess>(
+    args: Vec<XPathValue>,
+    doc: &D,
+    context: NodeId,
+) -> Result<XPathValue, String> {
     let s = if args.is_empty() {
         get_string_value(doc, context)
     } else if args.len() == 1 {
@@ -235,10 +255,7 @@ fn fn_normalize_space<D: DocumentAccess>(args: Vec<XPathValue>, doc: &D, context
         return Err("normalize-space() requires 0 or 1 arguments".to_string());
     };
 
-    let normalized: String = s
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
+    let normalized: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
 
     Ok(XPathValue::String(normalized))
 }
@@ -289,7 +306,11 @@ fn fn_lang(_args: Vec<XPathValue>) -> Result<XPathValue, String> {
 
 // Number Functions
 
-fn fn_number<D: DocumentAccess>(args: Vec<XPathValue>, doc: &D, context: NodeId) -> Result<XPathValue, String> {
+fn fn_number<D: DocumentAccess>(
+    args: Vec<XPathValue>,
+    doc: &D,
+    context: NodeId,
+) -> Result<XPathValue, String> {
     let value = if args.is_empty() {
         let s = get_string_value(doc, context);
         s.trim().parse().unwrap_or(f64::NAN)
@@ -395,7 +416,7 @@ mod tests {
             XPathValue::String("hello world".to_string()),
             XPathValue::String("world".to_string()),
         ];
-        assert_eq!(fn_contains(args).unwrap().to_boolean(), true);
+        assert!(fn_contains(args).unwrap().to_boolean());
     }
 
     #[test]

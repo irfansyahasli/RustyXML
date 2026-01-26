@@ -250,17 +250,17 @@ defmodule RustyXMLTest do
     end
 
     test "parses soft modifiers" do
-      spec_S = ~x"//item"S
-      assert spec_S.cast_to == :string
-      assert spec_S.soft_cast == true
+      spec_s = ~x"//item"S
+      assert spec_s.cast_to == :string
+      assert spec_s.soft_cast == true
 
-      spec_I = ~x"//item"I
-      assert spec_I.cast_to == :integer
-      assert spec_I.soft_cast == true
+      spec_i = ~x"//item"I
+      assert spec_i.cast_to == :integer
+      assert spec_i.soft_cast == true
 
-      spec_F = ~x"//item"F
-      assert spec_F.cast_to == :float
-      assert spec_F.soft_cast == true
+      spec_f = ~x"//item"F
+      assert spec_f.cast_to == :float
+      assert spec_f.soft_cast == true
     end
   end
 

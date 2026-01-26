@@ -48,7 +48,9 @@ impl<'a> Attribute<'a> {
 
     /// Get the prefix as a string
     pub fn prefix_str(&self) -> Option<&str> {
-        self.prefix.as_ref().and_then(|p| std::str::from_utf8(p.as_ref()).ok())
+        self.prefix
+            .as_ref()
+            .and_then(|p| std::str::from_utf8(p.as_ref()).ok())
     }
 }
 
@@ -78,7 +80,10 @@ pub fn parse_attributes_strict(input: &[u8]) -> Result<Vec<Attribute<'_>>, &'sta
     }
 }
 
-fn parse_attributes_with_validation(input: &[u8], strict: bool) -> (Vec<Attribute<'_>>, Option<&'static str>) {
+fn parse_attributes_with_validation(
+    input: &[u8],
+    strict: bool,
+) -> (Vec<Attribute<'_>>, Option<&'static str>) {
     let mut attrs = Vec::new();
     let mut pos = 0;
 
@@ -105,7 +110,10 @@ fn parse_attributes_with_validation(input: &[u8], strict: bool) -> (Vec<Attribut
             let first = input[pos];
             if !is_name_start_char(first) {
                 if strict {
-                    return (attrs, Some("Attribute name must start with letter, underscore, or colon"));
+                    return (
+                        attrs,
+                        Some("Attribute name must start with letter, underscore, or colon"),
+                    );
                 }
                 pos += 1;
                 continue;
@@ -168,7 +176,11 @@ fn parse_attributes_with_validation(input: &[u8], strict: bool) -> (Vec<Attribut
             }
             // Unquoted value (non-standard but handle it)
             let value_start = pos;
-            while pos < input.len() && !is_whitespace(input[pos]) && input[pos] != b'/' && input[pos] != b'>' {
+            while pos < input.len()
+                && !is_whitespace(input[pos])
+                && input[pos] != b'/'
+                && input[pos] != b'>'
+            {
                 pos += 1;
             }
             let value = decode_text(&input[value_start..pos]);

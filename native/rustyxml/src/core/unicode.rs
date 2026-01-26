@@ -141,9 +141,12 @@ pub fn is_name_start_char(c: char) -> bool {
 /// Per XML 1.0 Fourth Edition: Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender
 #[inline]
 pub fn is_name_char(c: char) -> bool {
-    is_name_start_char(c) ||
-    c == '-' || c == '.' ||
-    is_digit(c) || is_combining_char(c) || is_extender(c)
+    is_name_start_char(c)
+        || c == '-'
+        || c == '.'
+        || is_digit(c)
+        || is_combining_char(c)
+        || is_extender(c)
 }
 
 /// Check if a Unicode code point is a valid XML Char
@@ -167,8 +170,7 @@ pub fn validate_name(name: &[u8]) -> Result<(), &'static str> {
     }
 
     // Parse as UTF-8 string
-    let s = std::str::from_utf8(name)
-        .map_err(|_| "Name contains invalid UTF-8")?;
+    let s = std::str::from_utf8(name).map_err(|_| "Name contains invalid UTF-8")?;
 
     let mut chars = s.chars();
 
@@ -298,15 +300,24 @@ mod tests {
 
         // 0x065F is Arabic Wavy Hamza Below - NOT a valid NameChar
         let name = "_\u{065F}";
-        assert!(validate_name(name.as_bytes()).is_err(), "0x065F should be invalid");
+        assert!(
+            validate_name(name.as_bytes()).is_err(),
+            "0x065F should be invalid"
+        );
 
         // 0x309F is not a valid character (between 0x309E which is extender and 0x30A1)
         let name2 = "_\u{309F}";
-        assert!(validate_name(name2.as_bytes()).is_err(), "0x309F should be invalid");
+        assert!(
+            validate_name(name2.as_bytes()).is_err(),
+            "0x309F should be invalid"
+        );
 
         // 0x3030 is WAVY DASH - not in any valid category
         let name3 = "_\u{3030}";
-        assert!(validate_name(name3.as_bytes()).is_err(), "0x3030 should be invalid");
+        assert!(
+            validate_name(name3.as_bytes()).is_err(),
+            "0x3030 should be invalid"
+        );
     }
 
     #[test]

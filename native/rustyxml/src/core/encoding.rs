@@ -58,11 +58,15 @@ pub fn convert_to_utf8(input: Vec<u8>) -> Result<Vec<u8>, String> {
 /// Convert UTF-16 LE to UTF-8
 fn convert_utf16_le_to_utf8(input: &[u8]) -> Result<Vec<u8>, String> {
     // Skip BOM if present
-    let start = if input.starts_with(&[0xFF, 0xFE]) { 2 } else { 0 };
+    let start = if input.starts_with(&[0xFF, 0xFE]) {
+        2
+    } else {
+        0
+    };
     let bytes = &input[start..];
 
     // Ensure even number of bytes
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err("Invalid UTF-16 LE: odd number of bytes".to_string());
     }
 
@@ -81,11 +85,15 @@ fn convert_utf16_le_to_utf8(input: &[u8]) -> Result<Vec<u8>, String> {
 /// Convert UTF-16 BE to UTF-8
 fn convert_utf16_be_to_utf8(input: &[u8]) -> Result<Vec<u8>, String> {
     // Skip BOM if present
-    let start = if input.starts_with(&[0xFE, 0xFF]) { 2 } else { 0 };
+    let start = if input.starts_with(&[0xFE, 0xFF]) {
+        2
+    } else {
+        0
+    };
     let bytes = &input[start..];
 
     // Ensure even number of bytes
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err("Invalid UTF-16 BE: odd number of bytes".to_string());
     }
 
@@ -113,28 +121,34 @@ mod tests {
 
     #[test]
     fn test_detect_utf8_bom() {
-        assert_eq!(XmlEncoding::detect(&[0xEF, 0xBB, 0xBF, b'<']), XmlEncoding::Utf8);
+        assert_eq!(
+            XmlEncoding::detect(&[0xEF, 0xBB, 0xBF, b'<']),
+            XmlEncoding::Utf8
+        );
     }
 
     #[test]
     fn test_detect_utf16_le_bom() {
-        assert_eq!(XmlEncoding::detect(&[0xFF, 0xFE, b'<', 0x00]), XmlEncoding::Utf16Le);
+        assert_eq!(
+            XmlEncoding::detect(&[0xFF, 0xFE, b'<', 0x00]),
+            XmlEncoding::Utf16Le
+        );
     }
 
     #[test]
     fn test_detect_utf16_be_bom() {
-        assert_eq!(XmlEncoding::detect(&[0xFE, 0xFF, 0x00, b'<']), XmlEncoding::Utf16Be);
+        assert_eq!(
+            XmlEncoding::detect(&[0xFE, 0xFF, 0x00, b'<']),
+            XmlEncoding::Utf16Be
+        );
     }
 
     #[test]
     fn test_convert_utf16_le() {
         // "<r/>" in UTF-16 LE with BOM
         let utf16_le = vec![
-            0xFF, 0xFE,  // BOM
-            b'<', 0x00,
-            b'r', 0x00,
-            b'/', 0x00,
-            b'>', 0x00,
+            0xFF, 0xFE, // BOM
+            b'<', 0x00, b'r', 0x00, b'/', 0x00, b'>', 0x00,
         ];
         let result = convert_to_utf8(utf16_le).unwrap();
         assert_eq!(result, b"<r/>");
@@ -144,11 +158,8 @@ mod tests {
     fn test_convert_utf16_be() {
         // "<r/>" in UTF-16 BE with BOM
         let utf16_be = vec![
-            0xFE, 0xFF,  // BOM
-            0x00, b'<',
-            0x00, b'r',
-            0x00, b'/',
-            0x00, b'>',
+            0xFE, 0xFF, // BOM
+            0x00, b'<', 0x00, b'r', 0x00, b'/', 0x00, b'>',
         ];
         let result = convert_to_utf8(utf16_be).unwrap();
         assert_eq!(result, b"<r/>");

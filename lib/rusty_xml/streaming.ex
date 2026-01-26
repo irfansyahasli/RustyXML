@@ -120,7 +120,7 @@ defmodule RustyXML.Streaming do
           Enumerable.t()
   def stream_tags(source, tag, opts \\ [])
 
-  def stream_tags(path, tag, opts) when is_binary(path) and is_binary(path) do
+  def stream_tags(path, tag, opts) when is_binary(path) do
     # Check if it looks like a file path (not XML content)
     if String.starts_with?(path, "<") do
       # It's XML content, not a path

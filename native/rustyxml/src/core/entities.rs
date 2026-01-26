@@ -83,7 +83,12 @@ fn decode_entities_strict(input: &[u8]) -> Result<Vec<u8>, &'static str> {
                             if c == b';' {
                                 break;
                             }
-                            if !c.is_ascii_alphanumeric() && c != b'_' && c != b'-' && c != b'.' && c != b':' {
+                            if !c.is_ascii_alphanumeric()
+                                && c != b'_'
+                                && c != b'-'
+                                && c != b'.'
+                                && c != b':'
+                            {
                                 // Invalid character before semicolon
                                 return Err("Malformed entity reference (missing semicolon)");
                             }
@@ -339,8 +344,10 @@ pub fn validate_xml_content(content: &[u8]) -> Result<(), &'static str> {
                 return Err("Invalid UTF-8 encoding: bad continuation byte");
             }
             // Decode codepoint
-            let cp = ((b as u32 & 0x07) << 18) | ((c1 as u32 & 0x3F) << 12)
-                   | ((c2 as u32 & 0x3F) << 6) | (c3 as u32 & 0x3F);
+            let cp = ((b as u32 & 0x07) << 18)
+                | ((c1 as u32 & 0x3F) << 12)
+                | ((c2 as u32 & 0x3F) << 6)
+                | (c3 as u32 & 0x3F);
             if !is_valid_xml_char(cp) {
                 return Err("Invalid XML character");
             }
@@ -355,7 +362,10 @@ pub fn validate_xml_content(content: &[u8]) -> Result<(), &'static str> {
 /// Encode text for XML output (escape special characters)
 pub fn encode_text(input: &str) -> Cow<'_, str> {
     // Fast path: check if any escaping needed
-    if !input.bytes().any(|b| matches!(b, b'<' | b'>' | b'&' | b'"' | b'\'')) {
+    if !input
+        .bytes()
+        .any(|b| matches!(b, b'<' | b'>' | b'&' | b'"' | b'\''))
+    {
         return Cow::Borrowed(input);
     }
 

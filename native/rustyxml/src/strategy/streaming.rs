@@ -2,9 +2,9 @@
 //!
 //! Stateful parser that processes XML in chunks with bounded memory.
 
-use memchr::memchr_iter;
-use crate::core::tokenizer::{Tokenizer, TokenKind};
 use crate::core::attributes::parse_attributes;
+use crate::core::tokenizer::{TokenKind, Tokenizer};
+use memchr::memchr_iter;
 
 /// Stateful streaming XML parser
 pub struct StreamingParser {
@@ -39,13 +39,24 @@ struct ElementBuilder {
 /// Owned version of XmlEvent for storage
 #[derive(Debug, Clone)]
 pub enum OwnedXmlEvent {
-    StartElement { name: Vec<u8>, attributes: Vec<(Vec<u8>, Vec<u8>)> },
-    EndElement { name: Vec<u8> },
-    EmptyElement { name: Vec<u8>, attributes: Vec<(Vec<u8>, Vec<u8>)> },
+    StartElement {
+        name: Vec<u8>,
+        attributes: Vec<(Vec<u8>, Vec<u8>)>,
+    },
+    EndElement {
+        name: Vec<u8>,
+    },
+    EmptyElement {
+        name: Vec<u8>,
+        attributes: Vec<(Vec<u8>, Vec<u8>)>,
+    },
     Text(Vec<u8>),
     CData(Vec<u8>),
     Comment(Vec<u8>),
-    ProcessingInstruction { target: Vec<u8>, data: Vec<u8> },
+    ProcessingInstruction {
+        target: Vec<u8>,
+        data: Vec<u8>,
+    },
 }
 
 impl StreamingParser {
@@ -99,7 +110,9 @@ impl StreamingParser {
         // If we're building an element that spans chunks, save processed content
         if let Some(ref mut builder) = self.element_builder {
             // Accumulate everything from start to boundary
-            builder.accumulated.extend_from_slice(&self.buffer[builder.start_in_buffer..boundary]);
+            builder
+                .accumulated
+                .extend_from_slice(&self.buffer[builder.start_in_buffer..boundary]);
             // Reset start to 0 since we're draining up to boundary
             builder.start_in_buffer = 0;
         }
@@ -125,7 +138,8 @@ impl StreamingParser {
                         self.depth += 1;
 
                         // Check if this is a target tag (entering target element)
-                        let is_entering_target = self.is_target_tag(&name_bytes) && self.inside_target_depth == 0;
+                        let is_entering_target =
+                            self.is_target_tag(&name_bytes) && self.inside_target_depth == 0;
                         if is_entering_target {
                             self.inside_target_depth = self.depth;
                             // Start building element - capture from token start
@@ -154,9 +168,8 @@ impl StreamingParser {
 
                         // Emit event if we're inside a target element
                         if self.inside_target_depth > 0 {
-                            self.events.push(OwnedXmlEvent::EndElement {
-                                name: name_bytes,
-                            });
+                            self.events
+                                .push(OwnedXmlEvent::EndElement { name: name_bytes });
                         }
 
                         // Check if we're leaving the target element
@@ -167,7 +180,9 @@ impl StreamingParser {
                             if let Some(builder) = self.element_builder.take() {
                                 let end_pos = token.span.1;
                                 let mut element = builder.accumulated;
-                                element.extend_from_slice(&self.buffer[builder.start_in_buffer..end_pos]);
+                                element.extend_from_slice(
+                                    &self.buffer[builder.start_in_buffer..end_pos],
+                                );
                                 self.complete_elements.push(element);
                             }
                         }
@@ -181,13 +196,15 @@ impl StreamingParser {
                         let name_bytes = name.into_owned();
 
                         // Check if this is a target tag at top level
-                        let is_target_at_top = self.is_target_tag(&name_bytes) && self.inside_target_depth == 0;
+                        let is_target_at_top =
+                            self.is_target_tag(&name_bytes) && self.inside_target_depth == 0;
 
                         // If this is a target empty element, add it directly as complete
                         if is_target_at_top {
                             let start_pos = token.span.0;
                             let end_pos = token.span.1;
-                            self.complete_elements.push(self.buffer[start_pos..end_pos].to_vec());
+                            self.complete_elements
+                                .push(self.buffer[start_pos..end_pos].to_vec());
                         }
 
                         // Emit event if inside target OR if this IS a target empty element
@@ -225,7 +242,8 @@ impl StreamingParser {
                 TokenKind::Comment => {
                     if self.inside_target_depth > 0 {
                         if let Some(content) = token.content {
-                            self.events.push(OwnedXmlEvent::Comment(content.into_owned()));
+                            self.events
+                                .push(OwnedXmlEvent::Comment(content.into_owned()));
                         }
                     }
                 }
@@ -236,7 +254,11 @@ impl StreamingParser {
     }
 
     /// Extract attributes from buffer directly (avoids copy)
-    fn extract_attributes_from_buffer(&self, boundary: usize, span: (usize, usize)) -> Vec<(Vec<u8>, Vec<u8>)> {
+    fn extract_attributes_from_buffer(
+        &self,
+        boundary: usize,
+        span: (usize, usize),
+    ) -> Vec<(Vec<u8>, Vec<u8>)> {
         self.extract_attributes(&self.buffer[..boundary], span)
     }
 
@@ -296,7 +318,7 @@ impl StreamingParser {
     fn is_target_tag(&self, tag: &[u8]) -> bool {
         match &self.tag_filter {
             Some(filter) => tag == filter.as_slice(),
-            None => true,  // No filter means all tags are targets
+            None => true, // No filter means all tags are targets
         }
     }
 
@@ -337,9 +359,10 @@ impl StreamingParser {
         }
 
         let attrs = parse_attributes(&tag_content[pos..attr_end]);
-        attrs.into_iter().map(|a| {
-            (a.name.into_owned(), a.value.into_owned())
-        }).collect()
+        attrs
+            .into_iter()
+            .map(|a| (a.name.into_owned(), a.value.into_owned()))
+            .collect()
     }
 
     /// Take up to `max` parsed events
@@ -454,11 +477,8 @@ mod tests {
         let events = parser.take_events(10);
         // Should only have item events
         for event in &events {
-            match event {
-                OwnedXmlEvent::EmptyElement { name, .. } => {
-                    assert_eq!(name, b"item");
-                }
-                _ => {}
+            if let OwnedXmlEvent::EmptyElement { name, .. } = event {
+                assert_eq!(name, b"item");
             }
         }
     }

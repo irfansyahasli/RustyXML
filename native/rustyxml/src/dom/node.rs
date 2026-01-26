@@ -152,7 +152,12 @@ impl XmlNode {
     }
 
     /// Create a processing instruction node
-    pub fn processing_instruction(name_id: u32, span: (usize, usize), parent: Option<NodeId>, depth: u16) -> Self {
+    pub fn processing_instruction(
+        name_id: u32,
+        span: (usize, usize),
+        parent: Option<NodeId>,
+        depth: u16,
+    ) -> Self {
         XmlNode {
             kind: NodeKind::ProcessingInstruction,
             parent,

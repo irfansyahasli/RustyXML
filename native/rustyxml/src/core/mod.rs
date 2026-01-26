@@ -9,10 +9,10 @@
 //! - Unicode: XML 1.0 Unicode character class validation
 //! - DTD: DTD declaration store and post-parse validation
 
+pub mod attributes;
+pub mod dtd;
+pub mod encoding;
+pub mod entities;
 pub mod scanner;
 pub mod tokenizer;
-pub mod entities;
-pub mod attributes;
-pub mod encoding;
 pub mod unicode;
-pub mod dtd;

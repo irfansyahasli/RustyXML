@@ -7,12 +7,12 @@
 //! - Namespace resolution stack
 
 pub mod document;
+pub mod namespace;
 pub mod node;
 pub mod strings;
-pub mod namespace;
 
-pub use document::{XmlDocument, OwnedXmlDocument, XmlDocumentView};
-pub use node::{NodeId, NodeKind, XmlNode, XmlAttribute};
+pub use document::{OwnedXmlDocument, XmlDocument, XmlDocumentView};
+pub use node::{NodeId, NodeKind, XmlAttribute, XmlNode};
 pub use strings::StringPool;
 
 /// Trait for document access - enables XPath to work with both XmlDocument and XmlDocumentView

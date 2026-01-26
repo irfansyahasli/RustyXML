@@ -6,10 +6,10 @@
 //! - String interning for names
 //! - Zero-copy text content via spans
 
-use super::node::{XmlNode, XmlAttribute, NodeId, NodeKind};
+use super::node::{NodeId, NodeKind, XmlAttribute, XmlNode};
 use super::strings::StringPool;
-use crate::reader::slice::SliceReader;
 use crate::reader::events::XmlEvent;
+use crate::reader::slice::SliceReader;
 use std::borrow::Cow;
 
 /// An XML document stored in arena format
@@ -198,7 +198,10 @@ impl<'a> XmlDocumentView<'a> {
     /// Iterate over children of a node
     pub fn children(&self, id: NodeId) -> ViewChildIter<'_> {
         let first = self.get_node(id).and_then(|n| n.first_child);
-        ViewChildIter { view: self, next: first }
+        ViewChildIter {
+            view: self,
+            next: first,
+        }
     }
 
     /// Iterate over all descendants of a node
@@ -335,7 +338,9 @@ impl<'a> XmlDocument<'a> {
                 }
             } else if strict && !seen_xml_decl && seen_anything {
                 if let XmlEvent::XmlDeclaration { .. } = &event {
-                    return Err("XML declaration must be at the very beginning of the document".to_string());
+                    return Err(
+                        "XML declaration must be at the very beginning of the document".to_string(),
+                    );
                 }
             }
 
@@ -396,11 +401,17 @@ impl<'a> XmlDocument<'a> {
                             if start_name != end_elem.name.as_ref() {
                                 let start_str = String::from_utf8_lossy(&start_name);
                                 let end_str = String::from_utf8_lossy(end_elem.name.as_ref());
-                                return Err(format!("Tag mismatch: <{}> closed with </{}>", start_str, end_str));
+                                return Err(format!(
+                                    "Tag mismatch: <{}> closed with </{}>",
+                                    start_str, end_str
+                                ));
                             }
                         } else {
                             let end_str = String::from_utf8_lossy(end_elem.name.as_ref());
-                            return Err(format!("Unexpected end tag: </{}> without matching start tag", end_str));
+                            return Err(format!(
+                                "Unexpected end tag: </{}> without matching start tag",
+                                end_str
+                            ));
                         }
                     }
 
@@ -415,19 +426,25 @@ impl<'a> XmlDocument<'a> {
                         // Check if text contained entity references (Cow::Owned means entities were decoded)
                         // Entity references are not allowed at document level, even if they decode to whitespace
                         if matches!(&content, Cow::Owned(_)) {
-                            return Err("Entity/character references not allowed at document level".to_string());
+                            return Err(
+                                "Entity/character references not allowed at document level"
+                                    .to_string(),
+                            );
                         }
 
                         // Check if text is non-whitespace at document level
-                        let is_whitespace = content.as_ref().iter().all(|&b| {
-                            b == b' ' || b == b'\t' || b == b'\n' || b == b'\r'
-                        });
+                        let is_whitespace = content
+                            .as_ref()
+                            .iter()
+                            .all(|&b| b == b' ' || b == b'\t' || b == b'\n' || b == b'\r');
                         if !is_whitespace {
                             // Check if we're before or after root element
                             if seen_root_element {
                                 return Err("Content not allowed after root element".to_string());
                             } else {
-                                return Err("Text content not allowed before root element".to_string());
+                                return Err(
+                                    "Text content not allowed before root element".to_string()
+                                );
                             }
                         }
                     }
@@ -480,7 +497,8 @@ impl<'a> XmlDocument<'a> {
                     let depth = stack.len() as u16;
 
                     let target_id = self.strings.intern(target.as_ref());
-                    let node = XmlNode::processing_instruction(target_id, (0, 0), Some(parent_id), depth);
+                    let node =
+                        XmlNode::processing_instruction(target_id, (0, 0), Some(parent_id), depth);
 
                     let node_id = self.nodes.len() as NodeId;
                     self.nodes.push(node);
@@ -552,7 +570,9 @@ impl<'a> XmlDocument<'a> {
     }
 
     /// Find duplicate attribute name (for strict mode validation)
-    fn find_duplicate_attribute(attrs: &[crate::core::attributes::Attribute<'_>]) -> Option<String> {
+    fn find_duplicate_attribute(
+        attrs: &[crate::core::attributes::Attribute<'_>],
+    ) -> Option<String> {
         if attrs.len() < 2 {
             return None;
         }
@@ -634,7 +654,9 @@ impl<'a> XmlDocument<'a> {
             }
         } else {
             // Use default namespace
-            node.namespace_id = scope_default.or_else(|| default_ns.last().and_then(|o| *o)).unwrap_or(0);
+            node.namespace_id = scope_default
+                .or_else(|| default_ns.last().and_then(|o| *o))
+                .unwrap_or(0);
         }
 
         // Add node to arena and link to parent
@@ -767,7 +789,10 @@ impl<'a> XmlDocument<'a> {
     /// Iterate over children of a node
     pub fn children(&self, id: NodeId) -> ChildIter<'_, 'a> {
         let first = self.get_node(id).and_then(|n| n.first_child);
-        ChildIter { doc: self, next: first }
+        ChildIter {
+            doc: self,
+            next: first,
+        }
     }
 
     /// Iterate over all descendants of a node
@@ -1001,7 +1026,7 @@ fn parse_dtd_declarations(
     content: &[u8],
     decls: &mut crate::core::dtd::DtdDeclarations,
 ) -> Result<(), String> {
-    use crate::core::dtd::{EntityDecl, extract_entity_references};
+    use crate::core::dtd::{extract_entity_references, EntityDecl};
 
     let mut pos = 0;
     let len = content.len();
@@ -1076,7 +1101,9 @@ fn parse_dtd_declarations(
                 if pos < len {
                     pos += 1; // Skip closing quote
                 }
-            } else if pos + 6 <= len && (&content[pos..pos + 6] == b"SYSTEM" || &content[pos..pos + 6] == b"PUBLIC") {
+            } else if pos + 6 <= len
+                && (&content[pos..pos + 6] == b"SYSTEM" || &content[pos..pos + 6] == b"PUBLIC")
+            {
                 entity_decl.is_external = true;
                 // Skip to end of declaration - external entities don't cause recursion issues
                 // with general entities (only PE expansion would)

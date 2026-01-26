@@ -6,48 +6,48 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     // Operators
-    Slash,          // /
-    DoubleSlash,    // //
-    Dot,            // .
-    DoubleDot,      // ..
-    At,             // @
-    Pipe,           // |
-    Plus,           // +
-    Minus,          // -
-    Star,           // *
-    Eq,             // =
-    NotEq,          // !=
-    Lt,             // <
-    LtEq,           // <=
-    Gt,             // >
-    GtEq,           // >=
-    And,            // and
-    Or,             // or
-    Mod,            // mod
-    Div,            // div
+    Slash,       // /
+    DoubleSlash, // //
+    Dot,         // .
+    DoubleDot,   // ..
+    At,          // @
+    Pipe,        // |
+    Plus,        // +
+    Minus,       // -
+    Star,        // *
+    Eq,          // =
+    NotEq,       // !=
+    Lt,          // <
+    LtEq,        // <=
+    Gt,          // >
+    GtEq,        // >=
+    And,         // and
+    Or,          // or
+    Mod,         // mod
+    Div,         // div
 
     // Brackets
-    LeftParen,      // (
-    RightParen,     // )
-    LeftBracket,    // [
-    RightBracket,   // ]
+    LeftParen,    // (
+    RightParen,   // )
+    LeftBracket,  // [
+    RightBracket, // ]
 
     // Literals
     Number(f64),
     String(String),
 
     // Names
-    Name(String),           // NCName
-    NameTest(String),       // namespace:* or NCName:NCName
-    NodeType(String),       // node(), text(), comment(), processing-instruction()
+    Name(String),     // NCName
+    NameTest(String), // namespace:* or NCName:NCName
+    NodeType(String), // node(), text(), comment(), processing-instruction()
 
     // Axis
-    Axis(String),           // child::, descendant::, etc.
+    Axis(String), // child::, descendant::, etc.
 
     // Special
-    DoubleColon,    // ::
-    Comma,          // ,
-    Dollar,         // $
+    DoubleColon, // ::
+    Comma,       // ,
+    Dollar,      // $
 
     // End of input
     Eof,
@@ -128,12 +128,30 @@ impl<'a> Lexer<'a> {
                     Token::Dot
                 }
             }
-            '@' => { self.advance(1); Token::At }
-            '|' => { self.advance(1); Token::Pipe }
-            '+' => { self.advance(1); Token::Plus }
-            '-' => { self.advance(1); Token::Minus }
-            '*' => { self.advance(1); Token::Star }
-            '=' => { self.advance(1); Token::Eq }
+            '@' => {
+                self.advance(1);
+                Token::At
+            }
+            '|' => {
+                self.advance(1);
+                Token::Pipe
+            }
+            '+' => {
+                self.advance(1);
+                Token::Plus
+            }
+            '-' => {
+                self.advance(1);
+                Token::Minus
+            }
+            '*' => {
+                self.advance(1);
+                Token::Star
+            }
+            '=' => {
+                self.advance(1);
+                Token::Eq
+            }
             '!' => {
                 self.advance(1);
                 if self.peek() == Some('=') {
@@ -162,12 +180,30 @@ impl<'a> Lexer<'a> {
                     Token::Gt
                 }
             }
-            '(' => { self.advance(1); Token::LeftParen }
-            ')' => { self.advance(1); Token::RightParen }
-            '[' => { self.advance(1); Token::LeftBracket }
-            ']' => { self.advance(1); Token::RightBracket }
-            ',' => { self.advance(1); Token::Comma }
-            '$' => { self.advance(1); Token::Dollar }
+            '(' => {
+                self.advance(1);
+                Token::LeftParen
+            }
+            ')' => {
+                self.advance(1);
+                Token::RightParen
+            }
+            '[' => {
+                self.advance(1);
+                Token::LeftBracket
+            }
+            ']' => {
+                self.advance(1);
+                Token::RightBracket
+            }
+            ',' => {
+                self.advance(1);
+                Token::Comma
+            }
+            '$' => {
+                self.advance(1);
+                Token::Dollar
+            }
             ':' => {
                 self.advance(1);
                 if self.peek() == Some(':') {
@@ -201,7 +237,8 @@ impl<'a> Lexer<'a> {
         }
 
         // Decimal part
-        if self.peek() == Some('.') && self.peek_at(1).map(|c| c.is_ascii_digit()).unwrap_or(false) {
+        if self.peek() == Some('.') && self.peek_at(1).map(|c| c.is_ascii_digit()).unwrap_or(false)
+        {
             self.advance(1); // Skip '.'
             while let Some(c) = self.peek() {
                 if c.is_ascii_digit() {

@@ -2,11 +2,11 @@
 //!
 //! Uses Rayon for parallel evaluation of multiple XPath queries.
 
-use rayon::prelude::*;
 use crate::dom::DocumentAccess;
 #[cfg(test)]
 use crate::dom::XmlDocument;
 use crate::xpath::{evaluate, XPathValue};
+use rayon::prelude::*;
 
 /// Evaluate multiple XPath expressions in parallel
 pub fn evaluate_parallel<D: DocumentAccess + Sync>(
@@ -20,11 +20,7 @@ pub fn evaluate_parallel<D: DocumentAccess + Sync>(
 }
 
 /// Evaluate an XPath expression and map results
-pub fn xpath_map<D, F, T>(
-    doc: &D,
-    xpath: &str,
-    mapper: F,
-) -> Result<Vec<T>, String>
+pub fn xpath_map<D, F, T>(doc: &D, xpath: &str, mapper: F) -> Result<Vec<T>, String>
 where
     D: DocumentAccess + Sync,
     F: Fn(u32) -> T + Sync + Send,
@@ -33,9 +29,7 @@ where
     let result = evaluate(doc, xpath)?;
 
     match result {
-        XPathValue::NodeSet(nodes) => {
-            Ok(nodes.par_iter().map(|&n| mapper(n)).collect())
-        }
+        XPathValue::NodeSet(nodes) => Ok(nodes.par_iter().map(|&n| mapper(n)).collect()),
         _ => Err("XPath did not return a node-set".to_string()),
     }
 }
@@ -47,9 +41,7 @@ pub fn xmap<D: DocumentAccess + Sync>(
 ) -> Result<Vec<(String, XPathValue)>, String> {
     queries
         .par_iter()
-        .map(|(key, xpath)| {
-            evaluate(doc, xpath).map(|v| (key.to_string(), v))
-        })
+        .map(|(key, xpath)| evaluate(doc, xpath).map(|v| (key.to_string(), v)))
         .collect()
 }
 
@@ -70,10 +62,7 @@ mod tests {
     #[test]
     fn test_xmap() {
         let doc = XmlDocument::parse(b"<root><a/><b/></root>");
-        let queries = [
-            ("first", "//a"),
-            ("second", "//b"),
-        ];
+        let queries = [("first", "//a"), ("second", "//b")];
 
         let results = xmap(&doc, &queries).unwrap();
         assert_eq!(results.len(), 2);

@@ -2,15 +2,15 @@
 //!
 //! Evaluates compiled XPath expressions against an XML document.
 
-use std::collections::HashSet;
+use super::axes::{matches_node_test, navigate};
 use super::compiler::{CompiledExpr, CompiledNodeTest, Op};
-use super::value::XPathValue;
-use super::axes::{navigate, matches_node_test};
 use super::functions;
 use super::parser::BinaryOp;
-use crate::dom::{DocumentAccess, NodeId};
+use super::value::XPathValue;
 #[cfg(test)]
 use crate::dom::XmlDocument;
+use crate::dom::{DocumentAccess, NodeId};
+use std::collections::HashSet;
 
 /// Evaluation context - generic over document type
 pub struct EvalContext<'a, D: DocumentAccess> {
@@ -21,10 +21,7 @@ pub struct EvalContext<'a, D: DocumentAccess> {
 }
 
 /// Evaluate an XPath expression against any document type
-pub fn evaluate<D: DocumentAccess>(
-    doc: &D,
-    xpath: &str,
-) -> Result<XPathValue, String> {
+pub fn evaluate<D: DocumentAccess>(doc: &D, xpath: &str) -> Result<XPathValue, String> {
     let compiled = super::compiler::compile(xpath)?;
     let context = EvalContext {
         doc,
@@ -70,7 +67,9 @@ pub fn evaluate_compiled<'a, D: DocumentAccess>(
             }
 
             Op::Parent => {
-                let current = stack.pop().unwrap_or(XPathValue::single_node(ctx.context_node));
+                let current = stack
+                    .pop()
+                    .unwrap_or(XPathValue::single_node(ctx.context_node));
                 if let XPathValue::NodeSet(nodes) = current {
                     // Use HashSet for O(1) deduplication instead of O(n) Vec::contains
                     let mut seen = HashSet::with_capacity(nodes.len());
@@ -92,7 +91,9 @@ pub fn evaluate_compiled<'a, D: DocumentAccess>(
             }
 
             Op::Navigate(axis, node_test) => {
-                let current = stack.pop().unwrap_or(XPathValue::single_node(ctx.context_node));
+                let current = stack
+                    .pop()
+                    .unwrap_or(XPathValue::single_node(ctx.context_node));
                 if let XPathValue::NodeSet(nodes) = current {
                     // Special handling for attribute axis
                     if *axis == super::parser::Axis::Attribute {
@@ -132,10 +133,10 @@ pub fn evaluate_compiled<'a, D: DocumentAccess>(
                         for node in nodes {
                             let axis_nodes = navigate(ctx.doc, node, *axis);
                             for candidate in axis_nodes {
-                                if matches_node_test(ctx.doc, candidate, node_test) {
-                                    if seen.insert(candidate) {
-                                        result.push(candidate);
-                                    }
+                                if matches_node_test(ctx.doc, candidate, node_test)
+                                    && seen.insert(candidate)
+                                {
+                                    result.push(candidate);
                                 }
                             }
                         }
@@ -332,24 +333,18 @@ where
             }
             XPathValue::Boolean(false)
         }
-        (XPathValue::Boolean(_), _) | (_, XPathValue::Boolean(_)) => {
-            XPathValue::Boolean(cmp(
-                &left.to_boolean().to_string(),
-                &right.to_boolean().to_string(),
-            ))
-        }
+        (XPathValue::Boolean(_), _) | (_, XPathValue::Boolean(_)) => XPathValue::Boolean(cmp(
+            &left.to_boolean().to_string(),
+            &right.to_boolean().to_string(),
+        )),
         (XPathValue::Number(_), _) | (_, XPathValue::Number(_)) => {
             let ln = left.to_number();
             let rn = right.to_number();
             XPathValue::Boolean(cmp(&ln.to_string(), &rn.to_string()))
         }
-        (XPathValue::String(ls), XPathValue::String(rs)) => {
-            XPathValue::Boolean(cmp(ls, rs))
-        }
+        (XPathValue::String(ls), XPathValue::String(rs)) => XPathValue::Boolean(cmp(ls, rs)),
         // Handle StringList and any other combinations
-        _ => {
-            XPathValue::Boolean(cmp(&left.to_string_value(), &right.to_string_value()))
-        }
+        _ => XPathValue::Boolean(cmp(&left.to_string_value(), &right.to_string_value())),
     }
 }
 

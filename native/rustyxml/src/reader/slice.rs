@@ -3,16 +3,16 @@
 //! Parses XML from a byte slice with zero-copy semantics.
 //! Input references are maintained directly in the output.
 
-use crate::core::tokenizer::{Tokenizer, Token, TokenKind, ParseError};
+use super::events::{EndElement, StartElement, XmlEvent};
 use crate::core::attributes::{parse_attributes, parse_attributes_strict};
-use super::events::{XmlEvent, StartElement, EndElement};
+use crate::core::tokenizer::{ParseError, Token, TokenKind, Tokenizer};
 
 /// Zero-copy XML reader from a byte slice
 pub struct SliceReader<'a> {
     input: &'a [u8],
     tokenizer: Tokenizer<'a>,
     strict: bool,
-    attr_error: Option<&'static str>,
+    attr_parse_error: Option<ParseError>,
 }
 
 impl<'a> SliceReader<'a> {
@@ -22,7 +22,7 @@ impl<'a> SliceReader<'a> {
             input,
             tokenizer: Tokenizer::new(input),
             strict: false,
-            attr_error: None,
+            attr_parse_error: None,
         }
     }
 
@@ -32,20 +32,15 @@ impl<'a> SliceReader<'a> {
             input,
             tokenizer: Tokenizer::new_strict(input),
             strict: true,
-            attr_error: None,
+            attr_parse_error: None,
         }
     }
 
     /// Get parse error (strict mode only)
     pub fn error(&self) -> Option<&ParseError> {
         // Check for attribute errors first
-        if let Some(msg) = self.attr_error {
-            // Return a temporary error - this is a bit of a hack but works for now
-            static mut TEMP_ERROR: Option<ParseError> = None;
-            unsafe {
-                TEMP_ERROR = Some(ParseError::new(msg, 0));
-                TEMP_ERROR.as_ref()
-            }
+        if self.attr_parse_error.is_some() {
+            self.attr_parse_error.as_ref()
         } else {
             self.tokenizer.error()
         }
@@ -62,7 +57,7 @@ impl<'a> SliceReader<'a> {
                 TokenKind::StartTag => {
                     let attrs = self.parse_tag_attributes(&token);
                     // Check for attribute parsing error in strict mode
-                    if self.strict && self.attr_error.is_some() {
+                    if self.strict && self.attr_parse_error.is_some() {
                         return None;
                     }
                     let name = token.name?;
@@ -77,7 +72,7 @@ impl<'a> SliceReader<'a> {
                 TokenKind::EmptyTag => {
                     let attrs = self.parse_tag_attributes(&token);
                     // Check for attribute parsing error in strict mode
-                    if self.strict && self.attr_error.is_some() {
+                    if self.strict && self.attr_parse_error.is_some() {
                         return None;
                     }
                     let name = token.name?;
@@ -117,18 +112,25 @@ impl<'a> SliceReader<'a> {
                 TokenKind::XmlDeclaration => {
                     // Parse XML declaration attributes
                     let attrs = self.parse_tag_attributes(&token);
-                    let version = attrs.iter()
+                    let version = attrs
+                        .iter()
                         .find(|a| a.name.as_ref() == b"version")
                         .map(|a| a.value.clone())
                         .unwrap_or_else(|| std::borrow::Cow::Borrowed(b"1.0" as &[u8]));
-                    let encoding = attrs.iter()
+                    let encoding = attrs
+                        .iter()
                         .find(|a| a.name.as_ref() == b"encoding")
                         .map(|a| a.value.clone());
-                    let standalone = attrs.iter()
+                    let standalone = attrs
+                        .iter()
                         .find(|a| a.name.as_ref() == b"standalone")
                         .map(|a| a.value.as_ref() == b"yes");
 
-                    return Some(XmlEvent::XmlDeclaration { version, encoding, standalone });
+                    return Some(XmlEvent::XmlDeclaration {
+                        version,
+                        encoding,
+                        standalone,
+                    });
                 }
 
                 TokenKind::DocType => {
@@ -141,7 +143,10 @@ impl<'a> SliceReader<'a> {
     }
 
     /// Parse attributes from a tag token
-    fn parse_tag_attributes(&mut self, token: &Token<'a>) -> Vec<crate::core::attributes::Attribute<'a>> {
+    fn parse_tag_attributes(
+        &mut self,
+        token: &Token<'a>,
+    ) -> Vec<crate::core::attributes::Attribute<'a>> {
         let (start, end) = token.span;
         let tag_content = &self.input[start..end];
 
@@ -156,7 +161,14 @@ impl<'a> SliceReader<'a> {
         // Skip the tag name
         while pos < tag_content.len() {
             let b = tag_content[pos];
-            if b == b' ' || b == b'\t' || b == b'\n' || b == b'\r' || b == b'>' || b == b'/' || b == b'?' {
+            if b == b' '
+                || b == b'\t'
+                || b == b'\n'
+                || b == b'\r'
+                || b == b'>'
+                || b == b'/'
+                || b == b'?'
+            {
                 break;
             }
             pos += 1;
@@ -180,7 +192,7 @@ impl<'a> SliceReader<'a> {
             match parse_attributes_strict(attr_content) {
                 Ok(attrs) => attrs,
                 Err(msg) => {
-                    self.attr_error = Some(msg);
+                    self.attr_parse_error = Some(ParseError::new(msg, 0));
                     Vec::new()
                 }
             }
@@ -244,7 +256,8 @@ mod tests {
 
     #[test]
     fn test_cdata() {
-        let events: Vec<_> = SliceReader::new(b"<script><![CDATA[alert('hi')]]></script>").collect();
+        let events: Vec<_> =
+            SliceReader::new(b"<script><![CDATA[alert('hi')]]></script>").collect();
         assert_eq!(events.len(), 3);
         assert!(matches!(&events[1], XmlEvent::CData(c) if c.as_ref() == b"alert('hi')"));
     }

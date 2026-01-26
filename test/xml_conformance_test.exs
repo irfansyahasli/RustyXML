@@ -190,7 +190,7 @@ defmodule RustyXML.ConformanceTest do
       xml = "<root>&lt;</root>"
       events = RustyXML.Native.parse_events(xml)
       text_events = Enum.filter(events, fn e -> match?({:text, _}, e) end)
-      assert length(text_events) >= 1
+      assert text_events != []
     end
 
     test "greater-than entity &gt;" do
@@ -746,7 +746,7 @@ defmodule RustyXML.ConformanceTest do
     end
 
     test "wide element tree (many siblings)" do
-      items = Enum.map(1..100, fn i -> "<item#{i}/>" end) |> Enum.join()
+      items = Enum.map_join(1..100, fn i -> "<item#{i}/>" end)
       xml = "<root>#{items}</root>"
       doc = RustyXML.parse(xml)
       result = RustyXML.xpath(doc, "count(/root/*)")
@@ -763,7 +763,7 @@ defmodule RustyXML.ConformanceTest do
     end
 
     test "many attributes" do
-      attrs = Enum.map(1..50, fn i -> "attr#{i}=\"value#{i}\"" end) |> Enum.join(" ")
+      attrs = Enum.map_join(1..50, " ", fn i -> "attr#{i}=\"value#{i}\"" end)
       xml = "<root #{attrs}/>"
       doc = RustyXML.parse(xml)
       assert is_reference(doc)

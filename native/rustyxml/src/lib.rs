@@ -9,6 +9,8 @@
 
 // Allow dead code for scaffolded modules not yet fully integrated
 #![allow(dead_code)]
+// DocumentAccess trait imports are needed for method resolution even though the trait name isn't directly used
+#![allow(unused_imports)]
 
 use rustler::{Binary, Encoder, Env, NifResult, ResourceArc, Term};
 
@@ -36,8 +38,11 @@ mod term;
 mod xpath;
 
 use dom::XmlDocument;
-use resource::{StreamingParserResource, StreamingParserRef, DocumentResource, DocumentRef, XPathResultResource, XPathResultRef};
-use term::{xpath_value_to_term, events_to_term, node_to_term};
+use resource::{
+    DocumentRef, DocumentResource, StreamingParserRef, StreamingParserResource, XPathResultRef,
+    XPathResultResource,
+};
+use term::{events_to_term, node_to_term, xpath_value_to_term};
 use xpath::evaluate;
 
 // ============================================================================
@@ -156,9 +161,11 @@ fn parse_events<'a>(env: Env<'a>, input: Binary<'a>) -> NifResult<Term<'a>> {
                 reader::events::XmlEvent::StartElement(e) => {
                     Some(strategy::streaming::OwnedXmlEvent::StartElement {
                         name: e.name.into_owned(),
-                        attributes: e.attributes.into_iter().map(|a| {
-                            (a.name.into_owned(), a.value.into_owned())
-                        }).collect(),
+                        attributes: e
+                            .attributes
+                            .into_iter()
+                            .map(|a| (a.name.into_owned(), a.value.into_owned()))
+                            .collect(),
                     })
                 }
                 reader::events::XmlEvent::EndElement(e) => {
@@ -169,9 +176,11 @@ fn parse_events<'a>(env: Env<'a>, input: Binary<'a>) -> NifResult<Term<'a>> {
                 reader::events::XmlEvent::EmptyElement(e) => {
                     Some(strategy::streaming::OwnedXmlEvent::EmptyElement {
                         name: e.name.into_owned(),
-                        attributes: e.attributes.into_iter().map(|a| {
-                            (a.name.into_owned(), a.value.into_owned())
-                        }).collect(),
+                        attributes: e
+                            .attributes
+                            .into_iter()
+                            .map(|a| (a.name.into_owned(), a.value.into_owned()))
+                            .collect(),
                     })
                 }
                 reader::events::XmlEvent::Text(t) => {
@@ -223,9 +232,7 @@ fn parse_strict<'a>(env: Env<'a>, input: Binary<'a>) -> NifResult<Term<'a>> {
             let arc = ResourceArc::new(resource);
             Ok((atoms::ok(), arc).encode(env))
         }
-        Err(msg) => {
-            Ok((atoms::error(), msg).encode(env))
-        }
+        Err(msg) => Ok((atoms::error(), msg).encode(env)),
     }
 }
 
@@ -233,13 +240,9 @@ fn parse_strict<'a>(env: Env<'a>, input: Binary<'a>) -> NifResult<Term<'a>> {
 /// Uses with_view for O(1) access - no re-parsing!
 #[rustler::nif]
 fn xpath_query<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> NifResult<Term<'a>> {
-    let result = doc_ref.with_view(|view| {
-        match evaluate(&view, xpath_str) {
-            Ok(value) => xpath_value_to_term(env, value, &view),
-            Err(e) => {
-                (atoms::error(), e).encode(env)
-            }
-        }
+    let result = doc_ref.with_view(|view| match evaluate(&view, xpath_str) {
+        Ok(value) => xpath_value_to_term(env, value, &view),
+        Err(e) => (atoms::error(), e).encode(env),
     });
 
     match result {
@@ -252,8 +255,8 @@ fn xpath_query<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> NifRe
 /// Bypasses BEAM term construction - returns list of XML binaries for elements
 #[rustler::nif]
 fn xpath_query_raw<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> NifResult<Term<'a>> {
-    use xpath::XPathValue;
     use term::nodeset_to_xml_binaries;
+    use xpath::XPathValue;
 
     let result = doc_ref.with_view(|view| {
         match evaluate(&view, xpath_str) {
@@ -265,9 +268,7 @@ fn xpath_query_raw<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> N
                 // For non-node results, use regular conversion
                 _ => xpath_value_to_term(env, value, &view),
             },
-            Err(e) => {
-                (atoms::error(), e).encode(env)
-            }
+            Err(e) => (atoms::error(), e).encode(env),
         }
     });
 
@@ -287,12 +288,10 @@ fn xpath_query_raw<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> N
 fn xpath_lazy<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> NifResult<Term<'a>> {
     use xpath::XPathValue;
 
-    let nodes = doc_ref.with_view(|view| {
-        match evaluate(&view, xpath_str) {
-            Ok(XPathValue::NodeSet(nodes)) => Ok(nodes),
-            Ok(_) => Err("xpath_lazy only supports queries returning node sets".to_string()),
-            Err(e) => Err(e),
-        }
+    let nodes = doc_ref.with_view(|view| match evaluate(&view, xpath_str) {
+        Ok(XPathValue::NodeSet(nodes)) => Ok(nodes),
+        Ok(_) => Err("xpath_lazy only supports queries returning node sets".to_string()),
+        Err(e) => Err(e),
     });
 
     match nodes {
@@ -300,9 +299,7 @@ fn xpath_lazy<'a>(env: Env<'a>, doc_ref: DocumentRef, xpath_str: &str) -> NifRes
             let result = XPathResultResource::new(doc_ref.clone(), node_ids);
             Ok(ResourceArc::new(result).encode(env))
         }
-        Some(Err(e)) => {
-            Ok((atoms::error(), e).encode(env))
-        }
+        Some(Err(e)) => Ok((atoms::error(), e).encode(env)),
         None => Ok(atoms::nil().encode(env)),
     }
 }
@@ -334,7 +331,11 @@ fn result_text<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> Ni
                     // Concatenate all descendant text
                     let mut text = String::new();
                     collect_text(&view, node_id, &mut text);
-                    if text.is_empty() { None } else { Some(text) }
+                    if text.is_empty() {
+                        None
+                    } else {
+                        Some(text)
+                    }
                 }
                 _ => None,
             }
@@ -350,7 +351,11 @@ fn result_text<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> Ni
 }
 
 /// Helper to collect text from all descendants
-fn collect_text<D: crate::dom::DocumentAccess>(doc: &D, node_id: crate::dom::NodeId, buf: &mut String) {
+fn collect_text<D: crate::dom::DocumentAccess>(
+    doc: &D,
+    node_id: crate::dom::NodeId,
+    buf: &mut String,
+) {
     use crate::dom::NodeKind;
 
     if let Some(node) = doc.get_node(node_id) {
@@ -375,7 +380,12 @@ fn collect_text<D: crate::dom::DocumentAccess>(doc: &D, node_id: crate::dom::Nod
 
 /// Get an attribute value from a node at index in the result set
 #[rustler::nif]
-fn result_attr<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize, attr_name: &str) -> NifResult<Term<'a>> {
+fn result_attr<'a>(
+    env: Env<'a>,
+    result_ref: XPathResultRef,
+    index: usize,
+    attr_name: &str,
+) -> NifResult<Term<'a>> {
     let node_id = match result_ref.get_node_id(index) {
         Some(id) => id,
         None => return Ok(atoms::nil().encode(env)),
@@ -383,7 +393,8 @@ fn result_attr<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize, attr_
 
     let attr_value = result_ref.doc.with_view(|view| {
         use crate::dom::DocumentAccess;
-        view.get_attribute(node_id, attr_name).map(|s| s.to_string())
+        view.get_attribute(node_id, attr_name)
+            .map(|s| s.to_string())
     });
 
     match attr_value {
@@ -419,9 +430,9 @@ fn result_node<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> Ni
         None => return Ok(atoms::nil().encode(env)),
     };
 
-    let term = result_ref.doc.with_view(|view| {
-        node_to_term(env, &view, node_id)
-    });
+    let term = result_ref
+        .doc
+        .with_view(|view| node_to_term(env, &view, node_id));
 
     match term {
         Some(t) => Ok(t),
@@ -435,7 +446,12 @@ fn result_node<'a>(env: Env<'a>, result_ref: XPathResultRef, index: usize) -> Ni
 
 /// Get text content for a range of indices (single NIF call)
 #[rustler::nif]
-fn result_texts<'a>(env: Env<'a>, result_ref: XPathResultRef, start: usize, count: usize) -> NifResult<Term<'a>> {
+fn result_texts<'a>(
+    env: Env<'a>,
+    result_ref: XPathResultRef,
+    start: usize,
+    count: usize,
+) -> NifResult<Term<'a>> {
     let texts = result_ref.doc.with_view(|view| {
         use crate::dom::NodeKind;
 
@@ -450,7 +466,11 @@ fn result_texts<'a>(env: Env<'a>, result_ref: XPathResultRef, start: usize, coun
                         NodeKind::Element => {
                             let mut text = String::new();
                             collect_text(&view, node_id, &mut text);
-                            if text.is_empty() { None } else { Some(text) }
+                            if text.is_empty() {
+                                None
+                            } else {
+                                Some(text)
+                            }
                         }
                         _ => None,
                     }
@@ -483,14 +503,21 @@ fn result_texts<'a>(env: Env<'a>, result_ref: XPathResultRef, start: usize, coun
 
 /// Get attribute values for a range of indices (single NIF call)
 #[rustler::nif]
-fn result_attrs<'a>(env: Env<'a>, result_ref: XPathResultRef, attr_name: &str, start: usize, count: usize) -> NifResult<Term<'a>> {
+fn result_attrs<'a>(
+    env: Env<'a>,
+    result_ref: XPathResultRef,
+    attr_name: &str,
+    start: usize,
+    count: usize,
+) -> NifResult<Term<'a>> {
     let attrs = result_ref.doc.with_view(|view| {
         use crate::dom::DocumentAccess;
 
         let mut results = Vec::with_capacity(count);
         for i in start..(start + count) {
             let attr = if let Some(node_id) = result_ref.get_node_id(i) {
-                view.get_attribute(node_id, attr_name).map(|s| s.to_string())
+                view.get_attribute(node_id, attr_name)
+                    .map(|s| s.to_string())
             } else {
                 None
             };
@@ -554,12 +581,18 @@ fn result_extract<'a>(
                             NodeKind::Element => {
                                 let mut text = String::new();
                                 collect_text(&view, node_id, &mut text);
-                                if text.is_empty() { None } else { Some(text) }
+                                if text.is_empty() {
+                                    None
+                                } else {
+                                    Some(text)
+                                }
                             }
                             _ => None,
                         };
                         if let Some(t) = text {
-                            if let Ok(new_map) = map.map_put(atoms::text().encode(env), t.encode(env)) {
+                            if let Ok(new_map) =
+                                map.map_put(atoms::text().encode(env), t.encode(env))
+                            {
                                 map = new_map;
                             }
                         }
@@ -603,9 +636,7 @@ fn parse_and_xpath<'a>(env: Env<'a>, input: Binary<'a>, xpath_str: &str) -> NifR
 
     match evaluate(&doc, xpath_str) {
         Ok(value) => Ok(xpath_value_to_term(env, value, &doc)),
-        Err(e) => {
-            Ok((atoms::error(), e).encode(env))
-        }
+        Err(e) => Ok((atoms::error(), e).encode(env)),
     }
 }
 
@@ -638,7 +669,7 @@ fn xpath_with_subspecs<'a>(
     env: Env<'a>,
     input: Binary<'a>,
     parent_xpath: &str,
-    subspecs: Vec<(&str, &str)>,  // [(key, xpath), ...]
+    subspecs: Vec<(&str, &str)>, // [(key, xpath), ...]
 ) -> NifResult<Term<'a>> {
     use xpath::evaluate_from_node;
 
@@ -689,11 +720,7 @@ fn xpath_with_subspecs<'a>(
 /// Get string value of an XPath result (for `s` modifier)
 /// Handles node-set by getting text content of first node
 #[rustler::nif]
-fn xpath_string_value<'a>(
-    env: Env<'a>,
-    input: Binary<'a>,
-    xpath_str: &str,
-) -> NifResult<Term<'a>> {
+fn xpath_string_value<'a>(env: Env<'a>, input: Binary<'a>, xpath_str: &str) -> NifResult<Term<'a>> {
     let bytes = input.as_slice();
     let doc = XmlDocument::parse(bytes);
 
@@ -718,9 +745,7 @@ fn xpath_string_value<'a>(
             };
             Ok(string_val.encode(env))
         }
-        Err(e) => {
-            Ok((atoms::error(), e).encode(env))
-        }
+        Err(e) => Ok((atoms::error(), e).encode(env)),
     }
 }
 
@@ -732,30 +757,24 @@ fn xpath_string_value_doc<'a>(
     doc_ref: DocumentRef,
     xpath_str: &str,
 ) -> NifResult<Term<'a>> {
-    let result = doc_ref.with_view(|view| {
-        match evaluate(&view, xpath_str) {
-            Ok(value) => {
-                let string_val = match value {
-                    xpath::XPathValue::String(s) => s,
-                    xpath::XPathValue::Number(n) => n.to_string(),
-                    xpath::XPathValue::Boolean(b) => b.to_string(),
-                    xpath::XPathValue::NodeSet(nodes) => {
-                        if let Some(&node_id) = nodes.first() {
-                            get_node_text_content(&view, node_id)
-                        } else {
-                            String::new()
-                        }
+    let result = doc_ref.with_view(|view| match evaluate(&view, xpath_str) {
+        Ok(value) => {
+            let string_val = match value {
+                xpath::XPathValue::String(s) => s,
+                xpath::XPathValue::Number(n) => n.to_string(),
+                xpath::XPathValue::Boolean(b) => b.to_string(),
+                xpath::XPathValue::NodeSet(nodes) => {
+                    if let Some(&node_id) = nodes.first() {
+                        get_node_text_content(&view, node_id)
+                    } else {
+                        String::new()
                     }
-                    xpath::XPathValue::StringList(list) => {
-                        list.into_iter().next().unwrap_or_default()
-                    }
-                };
-                string_val.encode(env)
-            }
-            Err(e) => {
-                (atoms::error(), e).encode(env)
-            }
+                }
+                xpath::XPathValue::StringList(list) => list.into_iter().next().unwrap_or_default(),
+            };
+            string_val.encode(env)
         }
+        Err(e) => (atoms::error(), e).encode(env),
     });
 
     match result {
@@ -774,9 +793,7 @@ fn get_node_text_content<D: dom::DocumentAccess>(doc: &D, node_id: dom::NodeId) 
     };
 
     match node.kind {
-        NodeKind::Text | NodeKind::CData => {
-            doc.text_content(node_id).unwrap_or("").to_string()
-        }
+        NodeKind::Text | NodeKind::CData => doc.text_content(node_id).unwrap_or("").to_string(),
         NodeKind::Element => {
             // Concatenate all descendant text nodes
             let mut result = String::new();
@@ -785,14 +802,21 @@ fn get_node_text_content<D: dom::DocumentAccess>(doc: &D, node_id: dom::NodeId) 
         }
         NodeKind::Attribute => {
             // Attribute values are stored in name_id for virtual attribute nodes
-            doc.strings().get_str(node.name_id).unwrap_or("").to_string()
+            doc.strings()
+                .get_str(node.name_id)
+                .unwrap_or("")
+                .to_string()
         }
         _ => String::new(),
     }
 }
 
 /// Recursively collect text content from descendants
-fn collect_text_content<D: dom::DocumentAccess>(doc: &D, node_id: dom::NodeId, result: &mut String) {
+fn collect_text_content<D: dom::DocumentAccess>(
+    doc: &D,
+    node_id: dom::NodeId,
+    result: &mut String,
+) {
     use dom::NodeKind;
 
     for child_id in doc.children_vec(node_id) {
@@ -833,7 +857,11 @@ fn streaming_new_with_filter(tag: Binary) -> StreamingParserRef {
 
 /// Feed a chunk of data to the streaming parser
 #[rustler::nif]
-fn streaming_feed<'a>(env: Env<'a>, parser: StreamingParserRef, chunk: Binary) -> NifResult<Term<'a>> {
+fn streaming_feed<'a>(
+    env: Env<'a>,
+    parser: StreamingParserRef,
+    chunk: Binary,
+) -> NifResult<Term<'a>> {
     match parser.inner.lock() {
         Ok(mut inner) => {
             inner.feed(chunk.as_slice());
@@ -885,7 +913,10 @@ fn streaming_take_elements<'a>(
 
 /// Get number of available complete elements
 #[rustler::nif]
-fn streaming_available_elements<'a>(env: Env<'a>, parser: StreamingParserRef) -> NifResult<Term<'a>> {
+fn streaming_available_elements<'a>(
+    env: Env<'a>,
+    parser: StreamingParserRef,
+) -> NifResult<Term<'a>> {
     match parser.inner.lock() {
         Ok(inner) => Ok(inner.available_elements().encode(env)),
         Err(_) => Ok(0usize.encode(env)),
@@ -912,7 +943,8 @@ fn streaming_status<'a>(env: Env<'a>, parser: StreamingParserRef) -> NifResult<T
             inner.available_events(),
             inner.buffer_size(),
             inner.has_pending(),
-        ).encode(env)),
+        )
+            .encode(env)),
         Err(_) => Ok((0usize, 0usize, false).encode(env)),
     }
 }
@@ -936,9 +968,7 @@ fn xpath_parallel<'a>(
         for result in results.into_iter().rev() {
             let term = match result {
                 Ok(value) => xpath_value_to_term(env, value, &view),
-                Err(e) => {
-                    (atoms::error(), e).encode(env)
-                }
+                Err(e) => (atoms::error(), e).encode(env),
             };
             list = list.list_prepend(term);
         }

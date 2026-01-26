@@ -190,8 +190,11 @@ impl<'a> Tokenizer<'a> {
             // In strict mode, check for whitespace before XML declaration
             if self.strict {
                 // Check if there's whitespace at position 0
-                let has_leading_ws = self.scanner.position() == 0 &&
-                    matches!(self.scanner.peek(), Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r'));
+                let has_leading_ws = self.scanner.position() == 0
+                    && matches!(
+                        self.scanner.peek(),
+                        Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r')
+                    );
 
                 if has_leading_ws {
                     // Skip whitespace to see what follows
@@ -217,7 +220,10 @@ impl<'a> Tokenizer<'a> {
 
         if self.scanner.is_eof() {
             self.state = ParseState::Done;
-            return Some(Token::new(TokenKind::Eof, (self.scanner.position(), self.scanner.position())));
+            return Some(Token::new(
+                TokenKind::Eof,
+                (self.scanner.position(), self.scanner.position()),
+            ));
         }
 
         // Check what's next
@@ -226,7 +232,10 @@ impl<'a> Tokenizer<'a> {
             Some(_) => self.parse_text(),
             None => {
                 self.state = ParseState::Done;
-                Some(Token::new(TokenKind::Eof, (self.scanner.position(), self.scanner.position())))
+                Some(Token::new(
+                    TokenKind::Eof,
+                    (self.scanner.position(), self.scanner.position()),
+                ))
             }
         }
     }
@@ -254,7 +263,9 @@ impl<'a> Tokenizer<'a> {
             None => {
                 // In strict mode, set an error for invalid names
                 if self.strict {
-                    self.set_error("Invalid element name: must start with letter, underscore, or colon");
+                    self.set_error(
+                        "Invalid element name: must start with letter, underscore, or colon",
+                    );
                 }
                 return None;
             }
@@ -283,7 +294,11 @@ impl<'a> Tokenizer<'a> {
         self.scanner.set_position(end + 1);
         self.state = ParseState::InsideText;
 
-        let kind = if is_empty { TokenKind::EmptyTag } else { TokenKind::StartTag };
+        let kind = if is_empty {
+            TokenKind::EmptyTag
+        } else {
+            TokenKind::StartTag
+        };
         Some(Token::new(kind, (start, end + 1)).with_name(name))
     }
 
@@ -400,8 +415,10 @@ impl<'a> Tokenizer<'a> {
 
                 self.scanner.advance(3); // Skip '-->'
                 self.state = ParseState::InsideText;
-                return Some(Token::new(TokenKind::Comment, (start, self.scanner.position()))
-                    .with_content(Cow::Borrowed(content)));
+                return Some(
+                    Token::new(TokenKind::Comment, (start, self.scanner.position()))
+                        .with_content(Cow::Borrowed(content)),
+                );
             }
             self.scanner.advance(1);
         }
@@ -431,8 +448,10 @@ impl<'a> Tokenizer<'a> {
 
                 self.scanner.advance(3); // Skip ']]>'
                 self.state = ParseState::InsideText;
-                return Some(Token::new(TokenKind::CData, (start, self.scanner.position()))
-                    .with_content(Cow::Borrowed(content)));
+                return Some(
+                    Token::new(TokenKind::CData, (start, self.scanner.position()))
+                        .with_content(Cow::Borrowed(content)),
+                );
             }
             self.scanner.advance(1);
         }
@@ -449,7 +468,10 @@ impl<'a> Tokenizer<'a> {
         // In strict mode, validate DOCTYPE structure
         if self.strict {
             // Must have whitespace after DOCTYPE
-            if !matches!(self.scanner.peek(), Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r')) {
+            if !matches!(
+                self.scanner.peek(),
+                Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r')
+            ) {
                 self.set_error("Whitespace required after DOCTYPE");
                 return None;
             }
@@ -459,7 +481,9 @@ impl<'a> Tokenizer<'a> {
             if let Some(name) = self.scanner.read_name() {
                 // Check if the "name" is actually a keyword (SYSTEM/PUBLIC) - means real name is missing
                 if name == b"SYSTEM" || name == b"PUBLIC" {
-                    self.set_error("DOCTYPE declaration requires a name (found keyword without name)");
+                    self.set_error(
+                        "DOCTYPE declaration requires a name (found keyword without name)",
+                    );
                     return None;
                 }
                 if let Err(msg) = validate_name(name) {
@@ -510,7 +534,9 @@ impl<'a> Tokenizer<'a> {
             let mut ext_id_pos = 0;
 
             // Skip any initial whitespace
-            while ext_id_pos < remaining.len() && matches!(remaining[ext_id_pos], b' ' | b'\t' | b'\n' | b'\r') {
+            while ext_id_pos < remaining.len()
+                && matches!(remaining[ext_id_pos], b' ' | b'\t' | b'\n' | b'\r')
+            {
                 ext_id_pos += 1;
             }
 
@@ -542,11 +568,15 @@ impl<'a> Tokenizer<'a> {
                         // Find the public ID literal, then check what follows
                         let mut pub_scan = after_public_pos;
                         // Skip whitespace
-                        while pub_scan < remaining.len() && matches!(remaining[pub_scan], b' ' | b'\t' | b'\n' | b'\r') {
+                        while pub_scan < remaining.len()
+                            && matches!(remaining[pub_scan], b' ' | b'\t' | b'\n' | b'\r')
+                        {
                             pub_scan += 1;
                         }
                         // Find and skip the public ID literal
-                        if pub_scan < remaining.len() && (remaining[pub_scan] == b'"' || remaining[pub_scan] == b'\'') {
+                        if pub_scan < remaining.len()
+                            && (remaining[pub_scan] == b'"' || remaining[pub_scan] == b'\'')
+                        {
                             let pub_quote = remaining[pub_scan];
                             pub_scan += 1;
                             while pub_scan < remaining.len() && remaining[pub_scan] != pub_quote {
@@ -554,9 +584,13 @@ impl<'a> Tokenizer<'a> {
                             }
                             if pub_scan < remaining.len() {
                                 pub_scan += 1; // Skip closing quote
-                                // Now check what immediately follows - if it's a quote without whitespace, error
-                                if pub_scan < remaining.len() && (remaining[pub_scan] == b'"' || remaining[pub_scan] == b'\'') {
-                                    self.set_error("Whitespace required between public ID and system literal");
+                                               // Now check what immediately follows - if it's a quote without whitespace, error
+                                if pub_scan < remaining.len()
+                                    && (remaining[pub_scan] == b'"' || remaining[pub_scan] == b'\'')
+                                {
+                                    self.set_error(
+                                        "Whitespace required between public ID and system literal",
+                                    );
                                     return None;
                                 }
                             }
@@ -583,7 +617,7 @@ impl<'a> Tokenizer<'a> {
         let mut string_char: u8 = 0;
         let mut string_start: usize = 0;
         let mut validated_external_id = false;
-        let mut expecting_pubid = false;  // Next quoted string is PUBLIC ID
+        let mut expecting_pubid = false; // Next quoted string is PUBLIC ID
 
         while !self.scanner.is_eof() {
             let b = self.scanner.peek()?;
@@ -618,7 +652,7 @@ impl<'a> Tokenizer<'a> {
                             return None;
                         }
                         validated_external_id = true;
-                        expecting_pubid = true;  // Next quoted string will be public ID
+                        expecting_pubid = true; // Next quoted string will be public ID
                     }
                 }
                 // Check for SYSTEM keyword
@@ -639,7 +673,7 @@ impl<'a> Tokenizer<'a> {
                     in_string = true;
                     string_char = b;
                     self.scanner.advance(1);
-                    string_start = self.scanner.position();  // Mark start of string content
+                    string_start = self.scanner.position(); // Mark start of string content
                 }
                 b'[' => {
                     in_internal_subset = true;
@@ -671,7 +705,9 @@ impl<'a> Tokenizer<'a> {
                 b'>' if !in_internal_subset => {
                     // Validate NDATA notation references before completing DOCTYPE
                     if self.strict {
-                        if let (Some(ref entity_map), Some(ref notation_set)) = (&self.entities, &self.notations) {
+                        if let (Some(ref entity_map), Some(ref notation_set)) =
+                            (&self.entities, &self.notations)
+                        {
                             for (_, info) in entity_map.iter() {
                                 if let Some(ref notation_name) = info.ndata_notation {
                                     if !notation_set.contains(notation_name) {
@@ -684,7 +720,10 @@ impl<'a> Tokenizer<'a> {
                     }
                     self.scanner.advance(1);
                     self.state = ParseState::InsideText;
-                    return Some(Token::new(TokenKind::DocType, (start, self.scanner.position())));
+                    return Some(Token::new(
+                        TokenKind::DocType,
+                        (start, self.scanner.position()),
+                    ));
                 }
                 // In strict mode, validate content inside internal subset
                 b'<' if in_internal_subset && self.strict => {
@@ -697,7 +736,9 @@ impl<'a> Tokenizer<'a> {
                                 if let Some(name) = self.scanner.read_name() {
                                     // XML declaration is not allowed in DTD internal subset
                                     if name.eq_ignore_ascii_case(b"xml") {
-                                        self.set_error("XML declaration not allowed in DTD internal subset");
+                                        self.set_error(
+                                            "XML declaration not allowed in DTD internal subset",
+                                        );
                                         return None;
                                     }
                                     if let Err(msg) = validate_name(name) {
@@ -709,7 +750,9 @@ impl<'a> Tokenizer<'a> {
                                         Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r') => {}
                                         Some(b'?') if self.scanner.peek_at(1) == Some(b'>') => {}
                                         Some(_) => {
-                                            self.set_error("Invalid character after PI target name");
+                                            self.set_error(
+                                                "Invalid character after PI target name",
+                                            );
                                             return None;
                                         }
                                         None => {}
@@ -725,11 +768,14 @@ impl<'a> Tokenizer<'a> {
                                             self.scanner.set_position(pos);
                                             if self.scanner.starts_with(b"?>") {
                                                 // Check PI content for PE references before closing
-                                                let pi_content = self.scanner.slice(pi_content_start, pos);
+                                                let pi_content =
+                                                    self.scanner.slice(pi_content_start, pos);
                                                 for i in 0..pi_content.len() {
                                                     if pi_content[i] == b'%' {
                                                         // Check if this looks like a PE reference
-                                                        if i + 1 < pi_content.len() && is_name_start(pi_content[i + 1]) {
+                                                        if i + 1 < pi_content.len()
+                                                            && is_name_start(pi_content[i + 1])
+                                                        {
                                                             self.set_error("Parameter entity reference not allowed in processing instruction");
                                                             return None;
                                                         }
@@ -743,16 +789,20 @@ impl<'a> Tokenizer<'a> {
                                             // P29n05: Check for PE reference in PI content even if PI is unclosed
                                             // Scan up to end of data or until we see ]> which closes the internal subset
                                             let remaining = self.scanner.remaining();
-                                            let end_offset = remaining.iter().position(|&b| b == b']')
+                                            let end_offset = remaining
+                                                .iter()
+                                                .position(|&b| b == b']')
                                                 .unwrap_or(remaining.len());
                                             let end_pos = self.scanner.position() + end_offset;
-                                            let pi_content = self.scanner.slice(pi_content_start, end_pos);
+                                            let pi_content =
+                                                self.scanner.slice(pi_content_start, end_pos);
                                             for i in 0..pi_content.len() {
-                                                if pi_content[i] == b'%' {
-                                                    if i + 1 < pi_content.len() && is_name_start(pi_content[i + 1]) {
-                                                        self.set_error("Parameter entity reference not allowed in processing instruction");
-                                                        return None;
-                                                    }
+                                                if pi_content[i] == b'%'
+                                                    && i + 1 < pi_content.len()
+                                                    && is_name_start(pi_content[i + 1])
+                                                {
+                                                    self.set_error("Parameter entity reference not allowed in processing instruction");
+                                                    return None;
                                                 }
                                             }
                                             break;
@@ -766,22 +816,18 @@ impl<'a> Tokenizer<'a> {
                                     // Comment - validate and skip
                                     self.scanner.advance(2);
                                     let content_start = self.scanner.position();
-                                    loop {
-                                        if let Some(pos) = self.scanner.find_byte(b'-') {
-                                            self.scanner.set_position(pos);
-                                            if self.scanner.starts_with(b"-->") {
-                                                let content = self.scanner.slice(content_start, pos);
-                                                if let Err(msg) = validate_comment(content) {
-                                                    self.set_error(msg);
-                                                    return None;
-                                                }
-                                                self.scanner.advance(3);
-                                                break;
+                                    while let Some(pos) = self.scanner.find_byte(b'-') {
+                                        self.scanner.set_position(pos);
+                                        if self.scanner.starts_with(b"-->") {
+                                            let content = self.scanner.slice(content_start, pos);
+                                            if let Err(msg) = validate_comment(content) {
+                                                self.set_error(msg);
+                                                return None;
                                             }
-                                            self.scanner.advance(1);
-                                        } else {
+                                            self.scanner.advance(3);
                                             break;
                                         }
+                                        self.scanner.advance(1);
                                     }
                                 } else {
                                     // Element/Attlist/Entity/Notation declaration
@@ -789,14 +835,16 @@ impl<'a> Tokenizer<'a> {
                                     let keyword_start = self.scanner.position();
                                     while !self.scanner.is_eof() {
                                         match self.scanner.peek() {
-                                            Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r') => {
+                                            Some(b' ') | Some(b'\t') | Some(b'\n')
+                                            | Some(b'\r') => {
                                                 break;
                                             }
                                             Some(_) => self.scanner.advance(1),
                                             None => break,
                                         }
                                     }
-                                    let keyword = self.scanner.slice(keyword_start, self.scanner.position());
+                                    let keyword =
+                                        self.scanner.slice(keyword_start, self.scanner.position());
 
                                     // Validate declaration keyword is uppercase
                                     if let Err(msg) = validate_dtd_keyword(keyword) {
@@ -817,7 +865,10 @@ impl<'a> Tokenizer<'a> {
                                         is_parameter_entity = true;
                                         self.scanner.advance(1);
                                         // Must have whitespace after %
-                                        if !matches!(self.scanner.peek(), Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r')) {
+                                        if !matches!(
+                                            self.scanner.peek(),
+                                            Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r')
+                                        ) {
                                             self.set_error("Missing whitespace after '%' in entity declaration");
                                             return None;
                                         }
@@ -825,7 +876,9 @@ impl<'a> Tokenizer<'a> {
                                     }
 
                                     // Read and validate the declared name
-                                    let decl_name: Option<Vec<u8>> = if let Some(name) = self.scanner.read_name() {
+                                    let decl_name: Option<Vec<u8>> = if let Some(name) =
+                                        self.scanner.read_name()
+                                    {
                                         if let Err(msg) = validate_name(name) {
                                             self.set_error(msg);
                                             return None;
@@ -914,7 +967,10 @@ impl<'a> Tokenizer<'a> {
 
                                     // Validate ATTLIST declaration content
                                     if is_attlist_decl {
-                                        if let Err(msg) = validate_attlist_content(content, self.entities.as_ref()) {
+                                        if let Err(msg) = validate_attlist_content(
+                                            content,
+                                            self.entities.as_ref(),
+                                        ) {
                                             self.set_error(msg);
                                             return None;
                                         }
@@ -922,7 +978,9 @@ impl<'a> Tokenizer<'a> {
 
                                     // Validate ENTITY declaration content
                                     if is_entity_decl {
-                                        if let Err(msg) = validate_entity_content(content, is_parameter_entity) {
+                                        if let Err(msg) =
+                                            validate_entity_content(content, is_parameter_entity)
+                                        {
                                             self.set_error(msg);
                                             return None;
                                         }
@@ -942,13 +1000,13 @@ impl<'a> Tokenizer<'a> {
                                             // Parse entity metadata from content
                                             let entity_info = parse_entity_info(content);
                                             if is_parameter_entity {
-                                                if let Some(ref mut pe_map) = self.parameter_entities {
+                                                if let Some(ref mut pe_map) =
+                                                    self.parameter_entities
+                                                {
                                                     pe_map.insert(name, entity_info);
                                                 }
-                                            } else {
-                                                if let Some(ref mut e_map) = self.entities {
-                                                    e_map.insert(name, entity_info);
-                                                }
+                                            } else if let Some(ref mut e_map) = self.entities {
+                                                e_map.insert(name, entity_info);
                                             }
                                         } else if is_notation_decl {
                                             if let Some(ref mut n_set) = self.notations {
@@ -962,17 +1020,20 @@ impl<'a> Tokenizer<'a> {
                                 // Check for DTD declaration keywords without <! prefix
                                 // e.g., <ELEMENT instead of <!ELEMENT
                                 let remaining = self.scanner.remaining();
-                                if remaining.starts_with(b"ELEMENT") ||
-                                   remaining.starts_with(b"ATTLIST") ||
-                                   remaining.starts_with(b"ENTITY") ||
-                                   remaining.starts_with(b"NOTATION") {
+                                if remaining.starts_with(b"ELEMENT")
+                                    || remaining.starts_with(b"ATTLIST")
+                                    || remaining.starts_with(b"ENTITY")
+                                    || remaining.starts_with(b"NOTATION")
+                                {
                                     self.set_error("DTD declaration must start with '<!' not '<'");
                                     return None;
                                 }
                                 // Check for any element tag inside DTD (elements not allowed in DTD)
                                 // If we see <name where name is a valid element name (starts with letter, underscore, or colon)
                                 if !remaining.is_empty() && is_name_start(remaining[0]) {
-                                    self.set_error("Element tags not allowed inside DTD internal subset");
+                                    self.set_error(
+                                        "Element tags not allowed inside DTD internal subset",
+                                    );
                                     return None;
                                 }
                             }
@@ -991,7 +1052,7 @@ impl<'a> Tokenizer<'a> {
                         }
                         Some(c) if is_name_start(c) => {
                             // Valid PE reference start - read name and verify semicolon
-                            let ref_start = self.scanner.position();
+                            let _ref_start = self.scanner.position();
                             while !self.scanner.is_eof() {
                                 match self.scanner.peek() {
                                     Some(b';') => {
@@ -1008,7 +1069,9 @@ impl<'a> Tokenizer<'a> {
                                     }
                                     _ => {
                                         // P69n02: `%paaa` without semicolon
-                                        self.set_error("Invalid PE reference: missing ';' terminator");
+                                        self.set_error(
+                                            "Invalid PE reference: missing ';' terminator",
+                                        );
                                         return None;
                                     }
                                 }
@@ -1037,9 +1100,12 @@ impl<'a> Tokenizer<'a> {
         // Check for empty PI target (e.g., "<? ?>")
         if self.strict {
             let first_byte = self.scanner.peek();
-            if first_byte == Some(b' ') || first_byte == Some(b'\t') ||
-               first_byte == Some(b'\n') || first_byte == Some(b'\r') ||
-               first_byte == Some(b'?') {
+            if first_byte == Some(b' ')
+                || first_byte == Some(b'\t')
+                || first_byte == Some(b'\n')
+                || first_byte == Some(b'\r')
+                || first_byte == Some(b'?')
+            {
                 self.set_error("Processing instruction target cannot be empty");
                 return None;
             }
@@ -1080,7 +1146,9 @@ impl<'a> Tokenizer<'a> {
         // Strict mode: PI target "xml" (any case) is reserved
         // Only exact lowercase "xml" at document start is valid (XML declaration)
         if self.strict && is_xml_decl && name != b"xml" {
-            self.set_error("Processing instruction target cannot be 'xml' (case-insensitive reserved name)");
+            self.set_error(
+                "Processing instruction target cannot be 'xml' (case-insensitive reserved name)",
+            );
             return None;
         }
 
@@ -1111,7 +1179,11 @@ impl<'a> Tokenizer<'a> {
                 }
                 self.scanner.advance(2); // Skip '?>'
                 self.state = ParseState::InsideText;
-                let kind = if is_xml_decl { TokenKind::XmlDeclaration } else { TokenKind::ProcessingInstruction };
+                let kind = if is_xml_decl {
+                    TokenKind::XmlDeclaration
+                } else {
+                    TokenKind::ProcessingInstruction
+                };
                 return Some(Token::new(kind, (start, self.scanner.position())).with_name(name));
             }
             self.scanner.advance(1);
@@ -1124,7 +1196,10 @@ impl<'a> Tokenizer<'a> {
         self.state = ParseState::InsideText;
 
         // Find the next '<' or end of input
-        let end = self.scanner.find_tag_start().unwrap_or(self.scanner.remaining().len() + start);
+        let end = self
+            .scanner
+            .find_tag_start()
+            .unwrap_or(self.scanner.remaining().len() + start);
 
         if end == start {
             return None;
@@ -1265,7 +1340,10 @@ pub fn validate_text_content(content: &[u8]) -> Result<(), &'static str> {
 
 /// Validate entity references in element content
 /// Checks that all entity references are declared (except predefined entities)
-fn validate_content_entity_refs(content: &[u8], entities: &HashMap<Vec<u8>, EntityInfo>) -> Result<(), &'static str> {
+fn validate_content_entity_refs(
+    content: &[u8],
+    entities: &HashMap<Vec<u8>, EntityInfo>,
+) -> Result<(), &'static str> {
     let mut pos = 0;
     while pos < content.len() {
         if content[pos] == b'&' {
@@ -1289,7 +1367,8 @@ fn validate_content_entity_refs(content: &[u8], entities: &HashMap<Vec<u8>, Enti
             if pos > name_start && pos < content.len() && content[pos] == b';' {
                 let entity_name = &content[name_start..pos];
                 // Check for predefined entities (always valid)
-                let is_predefined = matches!(entity_name, b"lt" | b"gt" | b"amp" | b"quot" | b"apos");
+                let is_predefined =
+                    matches!(entity_name, b"lt" | b"gt" | b"amp" | b"quot" | b"apos");
                 if !is_predefined {
                     // Look up entity (case-sensitive)
                     if let Some(info) = entities.get(entity_name) {
@@ -1324,14 +1403,23 @@ fn validate_content_entity_refs(content: &[u8], entities: &HashMap<Vec<u8>, Enti
 
                             // Check if entity starts with &#60; which produces '<' and creates markup
                             // This is invalid if it creates unbalanced tags (start tag without end tag)
-                            if value.starts_with(b"&#60;") || value.starts_with(b"&#x3c;") || value.starts_with(b"&#x3C;") {
+                            if value.starts_with(b"&#60;")
+                                || value.starts_with(b"&#x3c;")
+                                || value.starts_with(b"&#x3C;")
+                            {
                                 // Check if followed by name-start char (would create start tag)
                                 let prefix_len = if value.starts_with(b"&#60;") { 5 } else { 6 };
-                                if value.len() > prefix_len && is_name_start_char(value[prefix_len]) {
+                                if value.len() > prefix_len && is_name_start_char(value[prefix_len])
+                                {
                                     // Extract the tag name
                                     let name_start = prefix_len;
                                     let mut name_end = name_start;
-                                    while name_end < value.len() && (is_name_char(value[name_end]) || value[name_end] == b'-' || value[name_end] == b'.' || value[name_end] == b':') {
+                                    while name_end < value.len()
+                                        && (is_name_char(value[name_end])
+                                            || value[name_end] == b'-'
+                                            || value[name_end] == b'.'
+                                            || value[name_end] == b':')
+                                    {
                                         name_end += 1;
                                     }
                                     let tag_name = &value[name_start..name_end];
@@ -1341,7 +1429,7 @@ fn validate_content_entity_refs(content: &[u8], entities: &HashMap<Vec<u8>, Enti
                                     end_tag.extend_from_slice(b"</");
                                     end_tag.extend_from_slice(tag_name);
                                     end_tag.push(b'>');
-                                    if !find_subsequence(value, &end_tag).is_some() {
+                                    if find_subsequence(value, &end_tag).is_none() {
                                         return Err("Entity replacement text contains character reference that produces unbalanced markup");
                                     }
                                 }
@@ -1359,9 +1447,11 @@ fn validate_content_entity_refs(content: &[u8], entities: &HashMap<Vec<u8>, Enti
                     } else {
                         // Check for case-insensitive match
                         let has_case_mismatch = entities.keys().any(|k| {
-                            k.len() == entity_name.len() &&
-                            k.iter().zip(entity_name.iter()).all(|(a, b)| a.eq_ignore_ascii_case(b)) &&
-                            k != entity_name
+                            k.len() == entity_name.len()
+                                && k.iter()
+                                    .zip(entity_name.iter())
+                                    .all(|(a, b)| a.eq_ignore_ascii_case(b))
+                                && k != entity_name
                         });
                         if has_case_mismatch {
                             return Err("Entity reference uses wrong case (entity names are case-sensitive)");
@@ -1385,7 +1475,10 @@ pub fn validate_xml_chars(content: &[u8]) -> Result<(), &'static str> {
 /// Validate all characters in a tag (between < and >)
 /// Handles quoted strings properly - validates both inside and outside quotes
 /// Also validates UTF-8 codepoints for invalid XML characters like U+FFFE/U+FFFF
-fn validate_tag_chars(content: &[u8], entities: Option<&HashMap<Vec<u8>, EntityInfo>>) -> Result<(), &'static str> {
+fn validate_tag_chars(
+    content: &[u8],
+    entities: Option<&HashMap<Vec<u8>, EntityInfo>>,
+) -> Result<(), &'static str> {
     let mut pos = 0;
     let mut in_quote = false;
     let mut quote_char: u8 = 0;
@@ -1466,8 +1559,10 @@ fn validate_tag_chars(content: &[u8], entities: Option<&HashMap<Vec<u8>, EntityI
             if c1 & 0xC0 != 0x80 || c2 & 0xC0 != 0x80 || c3 & 0xC0 != 0x80 {
                 return Err("Invalid UTF-8 encoding in tag");
             }
-            let cp = ((b as u32 & 0x07) << 18) | ((c1 as u32 & 0x3F) << 12)
-                   | ((c2 as u32 & 0x3F) << 6) | (c3 as u32 & 0x3F);
+            let cp = ((b as u32 & 0x07) << 18)
+                | ((c1 as u32 & 0x3F) << 12)
+                | ((c2 as u32 & 0x3F) << 6)
+                | (c3 as u32 & 0x3F);
             if !crate::core::entities::is_valid_xml_char(cp) {
                 return Err("Invalid XML character in tag");
             }
@@ -1485,6 +1580,7 @@ fn validate_tag_chars(content: &[u8], entities: Option<&HashMap<Vec<u8>, EntityI
 /// - Contains literal '<'
 /// - Contains character reference that produces '<' (&#60; or &#x3c;)
 /// - References an undeclared entity
+///
 /// Uses a visited set to prevent infinite loops in circular references.
 fn validate_entity_for_attr(
     entity_name: &[u8],
@@ -1516,7 +1612,9 @@ fn validate_entity_for_attr(
     if let Some(ref value) = info.value {
         // Check for literal '<' in replacement text
         if value.contains(&b'<') {
-            return Err("Entity replacement text contains '<' which is not allowed in attribute values");
+            return Err(
+                "Entity replacement text contains '<' which is not allowed in attribute values",
+            );
         }
 
         // Check for character references that produce '<' or bare '&'
@@ -1628,7 +1726,12 @@ fn validate_entity_nested_attrs(value: &[u8]) -> Result<(), &'static str> {
         if value[pos] == b'=' {
             pos += 1;
             // Skip whitespace
-            while pos < value.len() && (value[pos] == b' ' || value[pos] == b'\t' || value[pos] == b'\n' || value[pos] == b'\r') {
+            while pos < value.len()
+                && (value[pos] == b' '
+                    || value[pos] == b'\t'
+                    || value[pos] == b'\n'
+                    || value[pos] == b'\r')
+            {
                 pos += 1;
             }
             if pos >= value.len() {
@@ -1641,9 +1744,10 @@ fn validate_entity_nested_attrs(value: &[u8]) -> Result<(), &'static str> {
                 while pos < value.len() && value[pos] != quote {
                     if value[pos] == b'&' && pos + 1 < value.len() && value[pos + 1] == b'#' {
                         // Character reference - check if it produces '<' or '&'
-                        let ref_start = pos;
+                        let _ref_start = pos;
                         pos += 2; // Skip &#
-                        let is_hex = pos < value.len() && (value[pos] == b'x' || value[pos] == b'X');
+                        let is_hex =
+                            pos < value.len() && (value[pos] == b'x' || value[pos] == b'X');
                         if is_hex {
                             pos += 1;
                         }
@@ -1695,7 +1799,7 @@ fn validate_entity_content_structure(value: &[u8]) -> Result<(), &'static str> {
     let mut pos = 0;
     while pos < value.len() {
         // Check for &#38; which produces &
-        if value.len() >= 5 && pos + 5 <= value.len() && &value[pos..pos+5] == b"&#38;" {
+        if value.len() >= 5 && pos + 5 <= value.len() && &value[pos..pos + 5] == b"&#38;" {
             let after_pos = pos + 5;
             // If #38; is at the END of the entity, it produces bare & which can form split ref
             if after_pos == value.len() {
@@ -1709,7 +1813,10 @@ fn validate_entity_content_structure(value: &[u8]) -> Result<(), &'static str> {
             continue;
         }
         // Also check hex form &#x26;
-        if value.len() >= 6 && pos + 6 <= value.len() && (&value[pos..pos+6] == b"&#x26;" || &value[pos..pos+6] == b"&#X26;") {
+        if value.len() >= 6
+            && pos + 6 <= value.len()
+            && (&value[pos..pos + 6] == b"&#x26;" || &value[pos..pos + 6] == b"&#X26;")
+        {
             let after_pos = pos + 6;
             // If at end of entity, produces bare &
             if after_pos == value.len() {
@@ -1738,10 +1845,17 @@ fn validate_entity_content_structure(value: &[u8]) -> Result<(), &'static str> {
             }
             // Now we're at the start of element name - check for char refs
             let mut name_start = true;
-            while pos < value.len() && value[pos] != b'>' && value[pos] != b' ' && value[pos] != b'\t' && value[pos] != b'\n' && value[pos] != b'\r' && value[pos] != b'/' {
+            while pos < value.len()
+                && value[pos] != b'>'
+                && value[pos] != b' '
+                && value[pos] != b'\t'
+                && value[pos] != b'\n'
+                && value[pos] != b'\r'
+                && value[pos] != b'/'
+            {
                 if value[pos] == b'&' && pos + 1 < value.len() && value[pos + 1] == b'#' {
                     // Character reference in element name - decode and validate
-                    let ref_start = pos;
+                    let _ref_start = pos;
                     pos += 2; // Skip &#
                     let is_hex = pos < value.len() && (value[pos] == b'x' || value[pos] == b'X');
                     if is_hex {
@@ -1765,10 +1879,8 @@ fn validate_entity_content_structure(value: &[u8]) -> Result<(), &'static str> {
                                 if !is_name_start_char_codepoint(cp) {
                                     return Err("Character reference in element name produces invalid name start character");
                                 }
-                            } else {
-                                if !is_name_char_codepoint(cp) {
-                                    return Err("Character reference in element name produces invalid name character");
-                                }
+                            } else if !is_name_char_codepoint(cp) {
+                                return Err("Character reference in element name produces invalid name character");
                             }
                         }
                         name_start = false;
@@ -1918,7 +2030,10 @@ fn is_name_char_codepoint(cp: u32) -> bool {
 /// Validate attribute value content
 /// Checks that & is followed by valid entity reference, and < is not present
 /// If entity registry is provided, also validates that entities are declared and not external
-fn validate_attr_value(value: &[u8], entities: Option<&HashMap<Vec<u8>, EntityInfo>>) -> Result<(), &'static str> {
+fn validate_attr_value(
+    value: &[u8],
+    entities: Option<&HashMap<Vec<u8>, EntityInfo>>,
+) -> Result<(), &'static str> {
     let mut pos = 0;
     while pos < value.len() {
         if value[pos] == b'&' {
@@ -1947,13 +2062,11 @@ fn validate_attr_value(value: &[u8], entities: Option<&HashMap<Vec<u8>, EntityIn
                 while pos < value.len() && value[pos] != b';' {
                     let c = value[pos];
                     if is_hex {
-                        if !matches!(c, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F') {
+                        if !c.is_ascii_hexdigit() {
                             return Err("Invalid hex digit in character reference");
                         }
-                    } else {
-                        if !matches!(c, b'0'..=b'9') {
-                            return Err("Invalid digit in decimal character reference");
-                        }
+                    } else if !c.is_ascii_digit() {
+                        return Err("Invalid digit in decimal character reference");
                     }
                     pos += 1;
                 }
@@ -1978,15 +2091,18 @@ fn validate_attr_value(value: &[u8], entities: Option<&HashMap<Vec<u8>, EntityIn
                 if let Some(entity_map) = entities {
                     let entity_name = &value[name_start..pos];
                     // Check for predefined entities (always valid)
-                    let is_predefined = matches!(entity_name, b"lt" | b"gt" | b"amp" | b"quot" | b"apos");
+                    let is_predefined =
+                        matches!(entity_name, b"lt" | b"gt" | b"amp" | b"quot" | b"apos");
                     if !is_predefined {
                         // Check if entity exists first for case mismatch detection
                         if !entity_map.contains_key(entity_name) {
                             // Entity not declared - check for case-insensitive match
                             let has_case_mismatch = entity_map.keys().any(|k| {
-                                k.len() == entity_name.len() &&
-                                k.iter().zip(entity_name.iter()).all(|(a, b)| a.eq_ignore_ascii_case(b)) &&
-                                k != entity_name
+                                k.len() == entity_name.len()
+                                    && k.iter()
+                                        .zip(entity_name.iter())
+                                        .all(|(a, b)| a.eq_ignore_ascii_case(b))
+                                    && k != entity_name
                             });
                             if has_case_mismatch {
                                 return Err("Entity reference uses wrong case (entity names are case-sensitive)");
@@ -2009,7 +2125,7 @@ fn validate_attr_value(value: &[u8], entities: Option<&HashMap<Vec<u8>, EntityIn
 /// Whitespace required between pseudo-attributes
 fn validate_xml_decl(content: &[u8]) -> Result<(), &'static str> {
     // Must start with whitespace before version
-    let orig_content = content;
+    let _orig_content = content;
     let content = skip_ws(content);
 
     // Must start with version
@@ -2051,7 +2167,11 @@ fn validate_xml_decl(content: &[u8]) -> Result<(), &'static str> {
         }
     }
 
-    let rest = if value_end + 1 <= rest.len() { &rest[value_end + 1..] } else { &[] };
+    let rest = if value_end < rest.len() {
+        &rest[value_end + 1..]
+    } else {
+        &[]
+    };
 
     // Check for encoding or standalone - they require preceding whitespace
     if !rest.is_empty() {
@@ -2132,7 +2252,7 @@ fn validate_enc_name(name: &[u8]) -> Result<(), &'static str> {
 
     // First character must be a letter
     let first = name[0];
-    if !matches!(first, b'A'..=b'Z' | b'a'..=b'z') {
+    if !first.is_ascii_alphabetic() {
         return Err("Encoding name must start with a letter");
     }
 
@@ -2214,11 +2334,11 @@ fn validate_element_content(content: &[u8]) -> Result<(), &'static str> {
             // Check if followed by name char (PE reference)
             if i + 1 < content.len() && is_name_start(content[i + 1]) {
                 // Check if there's a ; later (completes the PE reference)
-                for j in (i + 2)..content.len() {
-                    if content[j] == b';' {
+                for &byte in content.iter().skip(i + 2) {
+                    if byte == b';' {
                         return Err("Parameter entity reference not allowed inside markup declarations in internal subset");
                     }
-                    if !is_name_char_byte(content[j]) {
+                    if !is_name_char_byte(byte) {
                         break;
                     }
                 }
@@ -2304,7 +2424,9 @@ fn validate_mixed_content(content: &[u8]) -> Result<(), &'static str> {
                     // Pure (#PCDATA) - only * is allowed as modifier (means same thing as nothing)
                     // + and ? are not valid for #PCDATA
                     if pos < len && matches!(content[pos], b'+' | b'?') {
-                        return Err("Invalid modifier on (#PCDATA) - only (#PCDATA) or (#PCDATA)* is valid");
+                        return Err(
+                            "Invalid modifier on (#PCDATA) - only (#PCDATA) or (#PCDATA)* is valid",
+                        );
                     }
                 }
                 return Ok(());
@@ -2420,7 +2542,7 @@ fn validate_children_content(content: &[u8]) -> Result<(), &'static str> {
                     return Err("Invalid consecutive or misplaced separators in content model");
                 }
                 // Check that separators are consistent within the current group
-                let current_depth_idx = depth.saturating_sub(1) as usize;
+                let current_depth_idx = depth.saturating_sub(1);
                 if current_depth_idx < separator_at_depth.len() {
                     let prev_sep = separator_at_depth[current_depth_idx];
                     if prev_sep == 0 {
@@ -2492,15 +2614,18 @@ fn is_name_char_byte(b: u8) -> bool {
 /// Checks that all referenced entities are already declared (no forward references)
 /// Also checks for indirect external entity references
 /// Skips validation inside CDATA sections
-fn validate_entity_value_refs(value: &[u8], entities: &HashMap<Vec<u8>, EntityInfo>) -> Result<(), &'static str> {
+fn validate_entity_value_refs(
+    value: &[u8],
+    entities: &HashMap<Vec<u8>, EntityInfo>,
+) -> Result<(), &'static str> {
     let mut pos = 0;
     while pos < value.len() {
         // Skip CDATA sections - entity references inside CDATA are literal text
-        if pos + 9 <= value.len() && &value[pos..pos+9] == b"<![CDATA[" {
+        if pos + 9 <= value.len() && &value[pos..pos + 9] == b"<![CDATA[" {
             pos += 9;
             // Find end of CDATA
             while pos + 3 <= value.len() {
-                if &value[pos..pos+3] == b"]]>" {
+                if &value[pos..pos + 3] == b"]]>" {
                     pos += 3;
                     break;
                 }
@@ -2530,7 +2655,8 @@ fn validate_entity_value_refs(value: &[u8], entities: &HashMap<Vec<u8>, EntityIn
             if pos > name_start && pos < value.len() && value[pos] == b';' {
                 let entity_name = &value[name_start..pos];
                 // Check for predefined entities (always valid)
-                let is_predefined = matches!(entity_name, b"lt" | b"gt" | b"amp" | b"quot" | b"apos");
+                let is_predefined =
+                    matches!(entity_name, b"lt" | b"gt" | b"amp" | b"quot" | b"apos");
                 if !is_predefined {
                     // Check if entity is declared
                     if !entities.contains_key(entity_name) {
@@ -2546,7 +2672,10 @@ fn validate_entity_value_refs(value: &[u8], entities: &HashMap<Vec<u8>, EntityIn
 
 /// Validate entity references in attribute default values
 /// Checks that all referenced entities are already declared (no forward references)
-fn validate_default_value_entities(value: &[u8], entities: &HashMap<Vec<u8>, EntityInfo>) -> Result<(), &'static str> {
+fn validate_default_value_entities(
+    value: &[u8],
+    entities: &HashMap<Vec<u8>, EntityInfo>,
+) -> Result<(), &'static str> {
     let mut pos = 0;
     while pos < value.len() {
         if value[pos] == b'&' {
@@ -2570,7 +2699,8 @@ fn validate_default_value_entities(value: &[u8], entities: &HashMap<Vec<u8>, Ent
             if pos > name_start && pos < value.len() && value[pos] == b';' {
                 let entity_name = &value[name_start..pos];
                 // Check for predefined entities (always valid)
-                let is_predefined = matches!(entity_name, b"lt" | b"gt" | b"amp" | b"quot" | b"apos");
+                let is_predefined =
+                    matches!(entity_name, b"lt" | b"gt" | b"amp" | b"quot" | b"apos");
                 if !is_predefined {
                     // Check if entity is declared
                     if !entities.contains_key(entity_name) {
@@ -2587,7 +2717,10 @@ fn validate_default_value_entities(value: &[u8], entities: &HashMap<Vec<u8>, Ent
 /// Validate ATTLIST declaration content
 /// AttlistDecl ::= '<!ATTLIST' S Name AttDef* S? '>'
 /// AttDef ::= S Name S AttType S DefaultDecl
-fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, EntityInfo>>) -> Result<(), &'static str> {
+fn validate_attlist_content(
+    content: &[u8],
+    entities: Option<&HashMap<Vec<u8>, EntityInfo>>,
+) -> Result<(), &'static str> {
     // Check for PE references inside markup declaration (not allowed in internal subset)
     // WFC: PEs in Internal Subset
     for i in 0..content.len() {
@@ -2595,11 +2728,11 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
             // Check if followed by name char (PE reference)
             if i + 1 < content.len() && is_name_start(content[i + 1]) {
                 // Check if there's a ; later (completes the PE reference)
-                for j in (i + 2)..content.len() {
-                    if content[j] == b';' {
+                for &byte in content.iter().skip(i + 2) {
+                    if byte == b';' {
                         return Err("Parameter entity reference not allowed inside markup declarations in internal subset");
                     }
-                    if !is_name_char_byte(content[j]) {
+                    if !is_name_char_byte(byte) {
                         break;
                     }
                 }
@@ -2609,8 +2742,15 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
 
     // Valid attribute types per XML 1.0
     let valid_att_types: &[&[u8]] = &[
-        b"CDATA", b"ID", b"IDREF", b"IDREFS", b"ENTITY", b"ENTITIES",
-        b"NMTOKEN", b"NMTOKENS", b"NOTATION",
+        b"CDATA",
+        b"ID",
+        b"IDREF",
+        b"IDREFS",
+        b"ENTITY",
+        b"ENTITIES",
+        b"NMTOKEN",
+        b"NMTOKENS",
+        b"NOTATION",
     ];
 
     // Default declarations
@@ -2646,6 +2786,7 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
     // State machine for parsing ATTLIST
     // States: ExpectAttrName, ExpectAttType, ExpectDefaultDecl
     #[derive(Clone, Copy, PartialEq)]
+    #[allow(clippy::enum_variant_names)]
     enum State {
         ExpectAttrName,
         ExpectAttType,
@@ -2741,7 +2882,7 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
                     break;
                 }
 
-                let name_start = pos;
+                let _name_start = pos;
                 while pos < len && is_name_char_byte(content[pos]) {
                     pos += 1;
                 }
@@ -2780,7 +2921,8 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
                             // Check for required whitespace between NOTATION and enumeration
                             // sa-068: NOTATION(foo) - missing space
                             let notation_ws_start = pos;
-                            while pos < len && matches!(content[pos], b' ' | b'\t' | b'\n' | b'\r') {
+                            while pos < len && matches!(content[pos], b' ' | b'\t' | b'\n' | b'\r')
+                            {
                                 pos += 1;
                             }
                             let notation_had_ws = pos > notation_ws_start;
@@ -2796,7 +2938,8 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
                             pos += 1;
 
                             // Skip initial whitespace inside enum
-                            while pos < len && matches!(content[pos], b' ' | b'\t' | b'\n' | b'\r') {
+                            while pos < len && matches!(content[pos], b' ' | b'\t' | b'\n' | b'\r')
+                            {
                                 pos += 1;
                             }
 
@@ -2810,7 +2953,9 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
                                     b'(' => depth += 1,
                                     b')' => depth -= 1,
                                     b',' => {
-                                        return Err("Invalid comma in enumeration - use '|' separator");
+                                        return Err(
+                                            "Invalid comma in enumeration - use '|' separator",
+                                        );
                                     }
                                     b'"' | b'\'' => {
                                         // Quoted name in NOTATION enumeration - P58n08
@@ -2827,9 +2972,9 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
 
                 // Check for enumeration type (a|b|c)
                 if !found_type && content[pos] == b'(' {
-                    let enum_start = pos;
+                    let _enum_start = pos;
                     let mut depth = 1;
-                    let mut has_content = false;
+                    let mut _has_content = false;
                     pos += 1;
 
                     // Skip initial whitespace inside enum
@@ -2854,7 +2999,7 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
                                 return Err("Enumeration values must not be quoted");
                             }
                             b'|' | b' ' | b'\t' | b'\n' | b'\r' => {}
-                            _ => has_content = true,
+                            _ => _has_content = true,
                         }
                         pos += 1;
                     }
@@ -2927,7 +3072,8 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
                             // Check for required whitespace before value
                             // P60n05: #FIXED"Introduction" is invalid (missing space)
                             let fixed_ws_start = pos;
-                            while pos < len && matches!(content[pos], b' ' | b'\t' | b'\n' | b'\r') {
+                            while pos < len && matches!(content[pos], b' ' | b'\t' | b'\n' | b'\r')
+                            {
                                 pos += 1;
                             }
                             let fixed_had_ws = pos > fixed_ws_start;
@@ -2989,11 +3135,13 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
                     while pos < len && is_name_char_byte(content[pos]) {
                         pos += 1;
                     }
-                    let token = &content[tok_start..pos];
+                    let _token = &content[tok_start..pos];
 
                     // Skip whitespace to see what follows
                     let mut check_pos = pos;
-                    while check_pos < len && matches!(content[check_pos], b' ' | b'\t' | b'\n' | b'\r') {
+                    while check_pos < len
+                        && matches!(content[check_pos], b' ' | b'\t' | b'\n' | b'\r')
+                    {
                         check_pos += 1;
                     }
 
@@ -3017,8 +3165,8 @@ fn validate_attlist_content(content: &[u8], entities: Option<&HashMap<Vec<u8>, E
                     }
 
                     // Otherwise it's the next attribute name
-                    pos = tok_start;  // Reset position
-                    found_default = true;  // Treat as implied default and continue
+                    pos = tok_start; // Reset position
+                    found_default = true; // Treat as implied default and continue
                 }
 
                 if found_default {
@@ -3056,11 +3204,10 @@ fn parse_entity_info(content: &[u8]) -> EntityInfo {
         // Find the quoted string value
         let quote = content[0];
         if quote == b'"' || quote == b'\'' {
-            if let Some(end) = content[1..].iter().position(|&b| b == quote) {
-                Some(content[1..1 + end].to_vec())
-            } else {
-                None
-            }
+            content[1..]
+                .iter()
+                .position(|&b| b == quote)
+                .map(|end| content[1..1 + end].to_vec())
         } else {
             None
         }
@@ -3178,8 +3325,8 @@ fn validate_entity_content(content: &[u8], is_parameter_entity: bool) -> Result<
         };
         if let Some(kw_idx) = keyword_idx {
             // Look for quoted string before the keyword
-            for i in 0..kw_idx {
-                if content[i] == b'"' || content[i] == b'\'' {
+            for &byte in content.iter().take(kw_idx) {
+                if byte == b'"' || byte == b'\'' {
                     return Err("External ID has wrong field ordering (quoted string before SYSTEM/PUBLIC keyword)");
                 }
             }
@@ -3211,7 +3358,9 @@ fn validate_entity_content(content: &[u8], is_parameter_entity: bool) -> Result<
 
             // P76n06: Check that NDATA is followed by whitespace (NDATAJPGformat is invalid)
             let after_ndata_raw = &content[ndata_idx + 5..];
-            if !after_ndata_raw.is_empty() && !matches!(after_ndata_raw[0], b' ' | b'\t' | b'\n' | b'\r') {
+            if !after_ndata_raw.is_empty()
+                && !matches!(after_ndata_raw[0], b' ' | b'\t' | b'\n' | b'\r')
+            {
                 // Could be NDATAfoo (no space) or NDATA at end
                 if is_name_char_byte(after_ndata_raw[0]) {
                     return Err("Whitespace required between NDATA and notation name");
@@ -3252,10 +3401,12 @@ fn validate_entity_content(content: &[u8], is_parameter_entity: bool) -> Result<
                             if is_name_start(after_literal[0]) {
                                 // Read the token
                                 let mut tok_end = 1;
-                                while tok_end < after_literal.len() && is_name_char_byte(after_literal[tok_end]) {
+                                while tok_end < after_literal.len()
+                                    && is_name_char_byte(after_literal[tok_end])
+                                {
                                     tok_end += 1;
                                 }
-                                let token = &after_literal[..tok_end];
+                                let _token = &after_literal[..tok_end];
                                 // Check if NDATA follows this token
                                 let after_token = skip_ws(&after_literal[tok_end..]);
                                 if after_token.starts_with(b"NDATA") {
@@ -3288,13 +3439,15 @@ fn validate_entity_content(content: &[u8], is_parameter_entity: bool) -> Result<
                 // Check for whitespace between public ID and system literal
                 let after_pubid = &after_public[2 + end_pos..];
                 if !after_pubid.is_empty() {
-                    let first_non_ws = after_pubid.iter().position(|&b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'));
+                    let first_non_ws = after_pubid
+                        .iter()
+                        .position(|&b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'));
                     if let Some(first_idx) = first_non_ws {
                         // If next char is a quote, check we had whitespace
-                        if after_pubid[first_idx] == b'"' || after_pubid[first_idx] == b'\'' {
-                            if first_idx == 0 {
-                                return Err("Whitespace required between public ID and system literal");
-                            }
+                        if (after_pubid[first_idx] == b'"' || after_pubid[first_idx] == b'\'')
+                            && first_idx == 0
+                        {
+                            return Err("Whitespace required between public ID and system literal");
                         }
                     }
                 }
@@ -3316,12 +3469,12 @@ fn validate_entity_content(content: &[u8], is_parameter_entity: bool) -> Result<
             while pos < len && content[pos] != quote {
                 // Check for invalid XML characters (sa-175: U+FFFF is not allowed)
                 // UTF-8 encoding: U+FFFE = EF BF BE, U+FFFF = EF BF BF
-                if content[pos] == 0xEF && pos + 2 < len {
-                    if content[pos + 1] == 0xBF {
-                        if content[pos + 2] == 0xBE || content[pos + 2] == 0xBF {
-                            return Err("Invalid XML character (U+FFFE or U+FFFF not allowed)");
-                        }
-                    }
+                if content[pos] == 0xEF
+                    && pos + 2 < len
+                    && content[pos + 1] == 0xBF
+                    && (content[pos + 2] == 0xBE || content[pos + 2] == 0xBF)
+                {
+                    return Err("Invalid XML character (U+FFFE or U+FFFF not allowed)");
                 }
 
                 // Check for PE reference in entity value (not allowed in internal subset)
@@ -3339,7 +3492,9 @@ fn validate_entity_content(content: &[u8], is_parameter_entity: bool) -> Result<
                             return Err("Parameter entity reference not allowed inside markup declarations in internal subset");
                         } else {
                             // P09n01: Incomplete PE reference - % followed by name but no ; terminator
-                            return Err("Incomplete parameter entity reference (missing ';' terminator)");
+                            return Err(
+                                "Incomplete parameter entity reference (missing ';' terminator)",
+                            );
                         }
                     }
                 }
@@ -3372,13 +3527,11 @@ fn validate_entity_content(content: &[u8], is_parameter_entity: bool) -> Result<
                         while pos < len && content[pos] != b';' && content[pos] != quote {
                             let c = content[pos];
                             if is_hex {
-                                if !matches!(c, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F') {
+                                if !c.is_ascii_hexdigit() {
                                     return Err("Invalid hex digit in character reference");
                                 }
-                            } else {
-                                if !matches!(c, b'0'..=b'9') {
-                                    return Err("Invalid digit in decimal character reference");
-                                }
+                            } else if !c.is_ascii_digit() {
+                                return Err("Invalid digit in decimal character reference");
                             }
                             pos += 1;
                         }
@@ -3575,7 +3728,10 @@ mod tests {
 
         let t2 = tok.next_token().unwrap();
         assert_eq!(t2.kind, TokenKind::Text);
-        assert_eq!(t2.content.as_ref().map(|c| c.as_ref()), Some(b"content" as &[u8]));
+        assert_eq!(
+            t2.content.as_ref().map(|c| c.as_ref()),
+            Some(b"content" as &[u8])
+        );
 
         let t3 = tok.next_token().unwrap();
         assert_eq!(t3.kind, TokenKind::EndTag);
@@ -3595,7 +3751,10 @@ mod tests {
         let mut tok = Tokenizer::new(b"<![CDATA[<script>code</script>]]>");
         let t = tok.next_token().unwrap();
         assert_eq!(t.kind, TokenKind::CData);
-        assert_eq!(t.content.as_ref().map(|c| c.as_ref()), Some(b"<script>code</script>" as &[u8]));
+        assert_eq!(
+            t.content.as_ref().map(|c| c.as_ref()),
+            Some(b"<script>code</script>" as &[u8])
+        );
     }
 
     #[test]
@@ -3603,6 +3762,9 @@ mod tests {
         let mut tok = Tokenizer::new(b"<!-- comment -->");
         let t = tok.next_token().unwrap();
         assert_eq!(t.kind, TokenKind::Comment);
-        assert_eq!(t.content.as_ref().map(|c| c.as_ref()), Some(b" comment " as &[u8]));
+        assert_eq!(
+            t.content.as_ref().map(|c| c.as_ref()),
+            Some(b" comment " as &[u8])
+        );
     }
 }

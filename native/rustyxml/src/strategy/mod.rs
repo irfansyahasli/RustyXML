@@ -7,7 +7,7 @@
 //! - Strategy D: Streaming tag parser (for large files)
 //! - Strategy E: Parallel XPath (for multiple queries)
 
-pub mod streaming;
 pub mod parallel;
+pub mod streaming;
 
 pub use streaming::StreamingParser;

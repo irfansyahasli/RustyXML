@@ -5,12 +5,12 @@
 //! - 27+ functions
 //! - Compiled expression caching
 
-pub mod lexer;
-pub mod parser;
+pub mod axes;
 pub mod compiler;
 pub mod eval;
-pub mod axes;
 pub mod functions;
+pub mod lexer;
+pub mod parser;
 pub mod value;
 
 pub use eval::{evaluate, evaluate_from_node};

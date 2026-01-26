@@ -29,8 +29,8 @@ pub struct ElementDecl {
 pub enum ContentSpec {
     Empty,
     Any,
-    Mixed(Vec<Vec<u8>>),      // List of allowed element names
-    Children(Vec<u8>),         // Raw content model (simplified)
+    Mixed(Vec<Vec<u8>>), // List of allowed element names
+    Children(Vec<u8>),   // Raw content model (simplified)
 }
 
 #[derive(Debug, Clone)]
@@ -65,11 +65,11 @@ pub enum AttDefault {
 #[derive(Debug, Clone)]
 pub struct EntityDecl {
     pub is_external: bool,
-    pub value: Option<Vec<u8>>,          // For internal entities
-    pub system_id: Option<Vec<u8>>,      // For external entities
-    pub public_id: Option<Vec<u8>>,      // For external entities
-    pub ndata: Option<Vec<u8>>,          // For unparsed entities
-    pub references: Vec<Vec<u8>>,        // Entities referenced in value
+    pub value: Option<Vec<u8>>,     // For internal entities
+    pub system_id: Option<Vec<u8>>, // For external entities
+    pub public_id: Option<Vec<u8>>, // For external entities
+    pub ndata: Option<Vec<u8>>,     // For unparsed entities
+    pub references: Vec<Vec<u8>>,   // Entities referenced in value
 }
 
 #[derive(Debug, Clone)]
@@ -84,7 +84,11 @@ impl DtdDeclarations {
     }
 
     /// Add an element declaration
-    pub fn add_element(&mut self, name: Vec<u8>, content_spec: ContentSpec) -> Result<(), &'static str> {
+    pub fn add_element(
+        &mut self,
+        name: Vec<u8>,
+        content_spec: ContentSpec,
+    ) -> Result<(), &'static str> {
         if self.elements.contains_key(&name) {
             return Err("Element type declared more than once");
         }
@@ -93,12 +97,19 @@ impl DtdDeclarations {
     }
 
     /// Add an entity declaration
-    pub fn add_entity(&mut self, name: Vec<u8>, decl: EntityDecl, is_pe: bool) -> Result<(), &'static str> {
-        let map = if is_pe { &mut self.pe_entities } else { &mut self.entities };
+    pub fn add_entity(
+        &mut self,
+        name: Vec<u8>,
+        decl: EntityDecl,
+        is_pe: bool,
+    ) -> Result<(), &'static str> {
+        let map = if is_pe {
+            &mut self.pe_entities
+        } else {
+            &mut self.entities
+        };
         // First declaration wins (per XML spec)
-        if !map.contains_key(&name) {
-            map.insert(name, decl);
-        }
+        map.entry(name).or_insert(decl);
         Ok(())
     }
 
@@ -127,7 +138,7 @@ impl DtdDeclarations {
 
     /// Check for circular entity references
     fn check_entity_recursion(&self) -> Result<(), String> {
-        for (name, _) in &self.entities {
+        for name in self.entities.keys() {
             let mut visited = HashSet::new();
             let mut stack = vec![name.clone()];
 
@@ -155,7 +166,7 @@ impl DtdDeclarations {
 
     /// Check NOTATION attributes reference declared notations
     fn check_notation_references(&self) -> Result<(), String> {
-        for (_elem, attrs) in &self.attlists {
+        for attrs in self.attlists.values() {
             for attr in attrs {
                 if let AttType::Notation(names) = &attr.att_type {
                     for name in names {
@@ -295,7 +306,8 @@ mod tests {
                 references: vec![b"foo".to_vec()],
             },
             false,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(dtd.validate().is_err());
     }
@@ -314,7 +326,8 @@ mod tests {
                 references: vec![b"b".to_vec()],
             },
             false,
-        ).unwrap();
+        )
+        .unwrap();
         dtd.add_entity(
             b"b".to_vec(),
             EntityDecl {
@@ -326,7 +339,8 @@ mod tests {
                 references: vec![b"a".to_vec()],
             },
             false,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(dtd.validate().is_err());
     }
@@ -345,7 +359,8 @@ mod tests {
                 references: vec![],
             },
             false,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(dtd.validate().is_ok());
     }

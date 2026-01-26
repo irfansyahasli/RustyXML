@@ -64,7 +64,7 @@ defmodule RustyXML do
   # Types
   # ==========================================================================
 
-  @type document :: reference()
+  @type document :: Native.document_ref()
   @type xml_node :: {:element, binary(), [{binary(), binary()}], [xml_node() | binary()]}
 
   # ==========================================================================
@@ -219,12 +219,12 @@ defmodule RustyXML do
     Native.parse_and_xpath(xml, path)
   end
 
-  def xpath(doc, %SweetXpath{} = spec) when is_reference(doc) do
+  def xpath(doc, %SweetXpath{} = spec) do
     result = Native.xpath_query(doc, spec.path)
     apply_modifiers(result, spec, nil)
   end
 
-  def xpath(doc, path) when is_reference(doc) and is_binary(path) do
+  def xpath(doc, path) when is_binary(path) do
     Native.xpath_query(doc, path)
   end
 
@@ -386,15 +386,9 @@ defmodule RustyXML do
 
   # Convert a node back to XML string for sub-queries
   defp node_to_xml({:element, name, attrs, children}) do
-    attr_str =
-      attrs
-      |> Enum.map(fn {k, v} -> " #{k}=\"#{escape_xml(v)}\"" end)
-      |> Enum.join()
+    attr_str = Enum.map_join(attrs, fn {k, v} -> " #{k}=\"#{escape_xml(v)}\"" end)
 
-    children_str =
-      children
-      |> Enum.map(&node_to_xml/1)
-      |> Enum.join()
+    children_str = Enum.map_join(children, &node_to_xml/1)
 
     "<#{name}#{attr_str}>#{children_str}</#{name}>"
   end
@@ -442,7 +436,7 @@ defmodule RustyXML do
 
   """
   @spec xmap_parallel(document(), keyword()) :: map()
-  def xmap_parallel(doc, specs) when is_reference(doc) and is_list(specs) do
+  def xmap_parallel(doc, specs) when is_list(specs) do
     xpaths = Enum.map(specs, fn {_key, spec} -> extract_path(spec) end)
     results = Native.xpath_parallel(doc, xpaths)
 
@@ -536,7 +530,7 @@ defmodule RustyXML do
 
   """
   @spec root(document()) :: xml_node() | nil
-  def root(doc) when is_reference(doc) do
+  def root(doc) do
     Native.get_root(doc)
   end
 
@@ -643,9 +637,7 @@ defmodule RustyXML do
 
   # Extract text from a node result
   defp extract_text_value({:element, _name, _attrs, children}) do
-    children
-    |> Enum.map(&extract_text_value/1)
-    |> Enum.join()
+    Enum.map_join(children, &extract_text_value/1)
   end
 
   defp extract_text_value(text) when is_binary(text), do: text
