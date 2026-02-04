@@ -8,11 +8,13 @@ defmodule RustyXML.Streaming do
 
   ## Memory Behavior
 
-  The streaming parser maintains a small buffer for partial elements. Memory
-  usage is bounded by:
+  The streaming parser maintains a small tail buffer (typically ~100 bytes)
+  for bytes that straddle chunk boundaries. On the common-case path the NIF
+  tokenizes the BEAM binary in-place (zero copy). Memory usage is bounded by:
 
     * `chunk_size` - bytes per IO read operation
     * Maximum single element size in your data
+    * NIF + BEAM combined peak is ~128 KB for a 2.93 MB document
 
   ## Usage
 
@@ -68,8 +70,9 @@ defmodule RustyXML.Streaming do
 
   The `:discard` option is accepted for SweetXml API compatibility but has no
   effect. RustyXML's streaming parser already operates in bounded memory
-  (~200 KB peak for a 2.93 MB document) by only materializing one element at a
-  time, so tag discarding for memory reduction is unnecessary.
+  (~128 KB combined NIF + BEAM peak for a 2.93 MB document) by only
+  materializing one element at a time, so tag discarding for memory reduction
+  is unnecessary.
   """
   @type stream_options :: [
           chunk_size: pos_integer(),

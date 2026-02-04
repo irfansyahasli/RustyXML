@@ -70,31 +70,43 @@ The lazy API keeps results in Rust memory, building BEAM terms only when accesse
 
 ## Memory Comparison
 
-RustyXML allocates on the Rust side; SweetXml allocates on the BEAM heap. Total memory includes both NIF peak and BEAM heap.
+### Measurement Methodology
+
+- **RustyXML "Total"** = NIF peak (instantaneous high-water mark via mimalloc tracking) + BEAM allocations (Benchee GC tracing for parse; `:erlang.memory(:total)` delta for streaming)
+- **SweetXml "BEAM"** = Total BEAM allocations measured by Benchee's GC tracing, which includes memory that was subsequently garbage-collected — i.e. cumulative allocations, not peak
+- **Streaming** uses `:erlang.memory(:total)` snapshot deltas, which are noisier than Benchee's per-process GC tracing
+
+These are not identical metrics. The ratios are directionally correct but should not be taken as exact.
 
 ### Parse Memory
 
-| Document | RustyXML Total | SweetXml (BEAM) | Ratio |
-|----------|----------------|-----------------|-------|
-| Small (14.6 KB) | **63.4 KB** | 5.65 MB | 0.01x |
-| Medium (290.6 KB) | **1.23 MB** | 112 MB | 0.01x |
-| Large (2.93 MB) | **12.81 MB** | 1,133 MB | 0.01x |
+| Document | RustyXML (NIF peak + BEAM) | SweetXml (BEAM total allocs) |
+|----------|----------------------------|------------------------------|
+| Small (14.6 KB) | **63.4 KB** | 5.65 MB |
+| Medium (290.6 KB) | **1.23 MB** | 112 MB |
+| Large (2.93 MB) | **12.81 MB** | 1,133 MB |
 
 ### XPath Memory
 
-| Query | RustyXML Total | SweetXml (BEAM) | Ratio |
-|-------|----------------|-----------------|-------|
-| `//item` (1K items) | **475 KB** | 6.12 MB | 0.08x |
-| `text()` (1K items) | **491 KB** | 7.10 MB | 0.07x |
-| `@id` (1K items) | **491 KB** | 6.45 MB | 0.08x |
-| Predicate (10K items) | **5.96 MB** | 68.2 MB | 0.09x |
-| Count (10K items) | **5.94 MB** | 60.8 MB | 0.10x |
+| Query | RustyXML (NIF peak + BEAM) | SweetXml (BEAM total allocs) |
+|-------|----------------------------|------------------------------|
+| `//item` (1K items) | **475 KB** | 6.12 MB |
+| `text()` (1K items) | **491 KB** | 7.10 MB |
+| `@id` (1K items) | **491 KB** | 6.45 MB |
+| Predicate (10K items) | **5.96 MB** | 68.2 MB |
+| Count (10K items) | **5.94 MB** | 60.8 MB |
 
 ### Streaming Memory
 
-| Operation | RustyXML Total | SweetXml (BEAM) | Ratio |
-|-----------|----------------|-----------------|-------|
-| Stream 10K items | **319 KB** | 73 MB | 0.004x |
+| Operation | RustyXML (NIF peak + BEAM delta) | SweetXml (BEAM delta) |
+|-----------|----------------------------------|-----------------------|
+| Stream 10K items | **128 KB** | 73 MB |
+
+> **Note:** SweetXml's `stream_tags` retains every parsed element in xmerl's
+> accumulator for the entire parse, so 73 MB reflects genuine SweetXml behavior
+> but is not representative of a properly bounded streaming parser.
+> For a fairer comparison, see the [Saxy Comparison](#saxy-comparison)
+> where both parsers use bounded memory (~128 KB vs ~124 KB).
 
 ## Streaming Comparison
 
@@ -102,7 +114,7 @@ RustyXML allocates on the Rust side; SweetXml allocates on the BEAM heap. Total 
 
 | Feature | RustyXML | SweetXml |
 |---------|----------|----------|
-| Memory model | Bounded (~319 KB) | Unbounded (73 MB) |
+| Memory model | Bounded (~128 KB) | Unbounded |
 | `Stream.take` | Works correctly | Hangs (issue #97) |
 | Chunk boundary handling | Handled correctly | N/A |
 | Output format | `{tag_atom, xml_string}` | `{tag_atom, xml_string}` |
@@ -138,9 +150,12 @@ RustyXML also serves as a drop-in Saxy replacement. SAX parsing benchmarks again
 | `parse_string/4` | 14.6 KB | 127 KB | 308 KB | **0.41x** |
 | `parse_string/4` | 2.93 MB | 26.4 MB | 59.6 MB | **0.44x** |
 | `SimpleForm` | 290.6 KB | 1.43 MB | 10.7 MB | **0.13x** |
-| `parse_stream/4` | 2.93 MB | 390 KB | 111 KB | 3.52x* |
+| `parse_stream/4` | 2.93 MB | 128 KB | 124 KB | **1.03x** |
 
-\* `parse_stream` uses more memory due to NIF buffer retention; under investigation.
+`parse_stream` memory is comparable: both parsers operate in bounded memory.
+RustyXML uses zero-copy tokenization and direct BEAM binary encoding to keep
+the NIF peak at ~67 KB; combined with ~61 KB BEAM allocation, the total is
+roughly equivalent to Saxy's pure-BEAM ~124 KB.
 
 ## Summary
 
@@ -162,11 +177,11 @@ RustyXML also serves as a drop-in Saxy replacement. SAX parsing benchmarks again
 
 ### Memory Rankings
 
-| Operation | vs SweetXml |
-|-----------|-------------|
-| Streaming | **228x less** |
-| Parse | **89-100x less** |
-| XPath queries | **10-14x less** |
+| Operation | Comparison | Notes |
+|-----------|------------|-------|
+| Streaming (vs Saxy) | **~1x** | Both properly bounded; fairest comparison |
+| Parse (vs SweetXml) | **~90x less** | Different metrics; see [methodology](#measurement-methodology) |
+| XPath (vs SweetXml) | **10-14x less** | |
 
 ### Recommended API by Use Case
 
@@ -186,15 +201,15 @@ RustyXML also serves as a drop-in Saxy replacement. SAX parsing benchmarks again
 
 ### Key Findings
 
-1. **Parsing is 8-72x faster** — The structural index with SIMD scanning dramatically outperforms xmerl, with gains increasing on larger documents.
+1. **Parsing is 8-72x faster than SweetXml** — The structural index with SIMD scanning dramatically outperforms xmerl, with gains increasing on larger documents.
 
-2. **All XPath queries are faster** — Full elements (1.48x), text (2.0x), attributes (1.7x), predicates (3.65x), counts (2.8x).
+2. **SAX parsing is 1.3-1.8x faster than Saxy** — with comparable streaming memory (~128 KB vs ~124 KB). This is the fairest streaming comparison since both parsers are properly bounded.
 
-3. **Lazy XPath is 3-4.4x faster** — Keeping node IDs in Rust and accessing on-demand eliminates BEAM term construction overhead.
+3. **All XPath queries are faster** — Full elements (1.48x), text (2.0x), attributes (1.7x), predicates (3.65x), counts (2.8x) vs SweetXml.
 
-4. **Streaming is 16.2x faster** — Complete elements built in Rust with bounded memory (319 KB vs 73 MB).
+4. **Lazy XPath is 3-4.4x faster** — Keeping node IDs in Rust and accessing on-demand eliminates BEAM term construction overhead.
 
-5. **89-228x less memory** — The structural index uses compact spans instead of string copies. Parse memory for 2.93 MB doc: 12.8 MB vs 1,133 MB. Streaming: 319 KB vs 73 MB.
+5. **Significantly less memory for parsing** — The structural index uses compact spans instead of string copies. Parse memory for 2.93 MB doc: 12.8 MB (NIF peak + BEAM) vs SweetXml's 1,133 MB (BEAM total allocations). Note: these are [different metrics](#measurement-methodology) — the magnitude of difference is real but the exact ratio is approximate.
 
 6. **Stream.take works correctly** — Fixes SweetXml issue #97. Bounded memory regardless of file size.
 

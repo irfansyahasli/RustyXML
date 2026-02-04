@@ -8,13 +8,13 @@
 
 - **100% W3C/OASIS XML Conformance** — 1089/1089 test cases pass ([details](#xml-conformance))
 - **8-72x faster parsing** than SweetXml/xmerl, with gains increasing on larger documents
-- **89-100x less memory** — structural index uses compact spans instead of string copies
+- **1.3-1.8x faster SAX parsing** than Saxy, with comparable streaming memory
 - **SIMD-accelerated scanning** via memchr for fast delimiter detection
 - **Zero-copy structural index** — compact span structs reference the original input
 - **Full XPath 1.0** with all 13 axes and 27+ functions
 - **SweetXml-compatible API** with `~x` sigil and modifiers
 - **Saxy-compatible API** — SAX handler callbacks, `SimpleForm`, `Partial`, XML encoding
-- **16x faster streaming** for large files with bounded memory (319 KB vs 73 MB)
+- **Bounded streaming** for large files (~128 KB peak); see [benchmarks](docs/BENCHMARK.md) for methodology
 
 ## Installation
 

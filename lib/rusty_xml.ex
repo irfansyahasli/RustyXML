@@ -516,9 +516,9 @@ defmodule RustyXML do
       RustyXML's streaming parser yields complete elements directly from Rust
       as they are parsed — there is no event batching step to tune.
     * `:discard` - Accepted for SweetXml API compatibility but has no effect.
-      RustyXML's streaming parser already operates in bounded memory (~200 KB
-      peak for a 2.93 MB document) by only materializing one element at a time,
-      so tag discarding for memory reduction is unnecessary.
+      RustyXML's streaming parser already operates in bounded memory (~128 KB
+      combined NIF + BEAM peak for a 2.93 MB document) by only materializing
+      one element at a time, so tag discarding for memory reduction is unnecessary.
 
   ## Examples
 
@@ -622,11 +622,13 @@ defmodule RustyXML do
   Drop-in replacement for `Saxy.parse_stream/4`.
 
   Accepts any `Enumerable` that yields binary chunks (e.g. `File.stream!/3`).
-  Uses bounded memory via binary-encoded events: the NIF tokenizes each chunk
-  in Rust and returns all events packed into a single binary. Elixir then
-  decodes one event at a time via binary pattern matching, so only one event
-  tuple is ever live on the heap — matching Saxy's inline-handler memory
-  profile while running ~1.7x faster.
+  Uses bounded memory via zero-copy tokenization and direct BEAM binary
+  encoding: when the internal buffer is empty (common case), the NIF tokenizes
+  the BEAM binary in-place without copying. Events are written directly into an
+  OwnedBinary on the BEAM heap — no intermediate Rust Vec allocation. Elixir
+  then decodes one event at a time via binary pattern matching, so only one
+  event tuple is ever live on the heap. Combined NIF + BEAM peak is ~128 KB
+  for a 2.93 MB document, comparable to Saxy while running ~1.8x faster.
 
   ## Examples
 

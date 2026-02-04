@@ -31,7 +31,7 @@ All three paths share the same SIMD-accelerated scanner and well-formedness vali
 - **Structural index** — Elements stored as compact span structs (32 bytes each) referencing the original input
 - **Zero-copy strings** — Tag names, attribute values, and text stored as `(offset, length)` spans
 - **Sub-binary returns** — BEAM sub-binaries share memory with the original input
-- **Streaming bounded memory** — Process 10GB+ files with configurable buffer size
+- **Streaming bounded memory** — Process 10GB+ files with ~128 KB combined NIF + BEAM peak via zero-copy tokenization and direct BEAM binary encoding
 - **mimalloc allocator** — High-performance allocator for reduced fragmentation
 - **Optional memory tracking** — Opt-in profiling with zero overhead when disabled
 
@@ -548,16 +548,16 @@ RustyXML.SimpleForm.parse_string(xml)      # was: Saxy.SimpleForm.parse_string(.
 
 See [BENCHMARK.md](BENCHMARK.md) for detailed performance comparisons.
 
-**vs SweetXml:**
+**vs Saxy (fairest comparison — both are properly bounded streaming parsers):**
+- **SAX parsing**: 1.3-1.8x faster
+- **SimpleForm**: 1.4-1.5x faster
+- **Streaming memory**: comparable (~128 KB vs ~124 KB)
+
+**vs SweetXml/xmerl:**
 - **Parsing**: 8-72x faster
 - **XPath queries**: 1.5-3.7x faster
-- **Streaming**: 16x faster with 228x less memory
-- **Memory**: 89-100x less for parsing
-
-**vs Saxy:**
-- **SAX parsing**: 1.3-1.7x faster
-- **SimpleForm**: 1.4-1.5x faster
-- **SAX memory**: 2-8x less
+- **Parse memory**: significantly less (different measurement methods; see [BENCHMARK.md](BENCHMARK.md))
+- **Streaming**: 16x faster (SweetXml streaming is unbounded due to xmerl accumulator)
 
 ---
 

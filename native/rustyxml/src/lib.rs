@@ -999,11 +999,19 @@ fn streaming_sax_new() -> StreamingSaxParserRef {
 
 /// Feed a chunk and return SAX events as a compact binary.
 ///
-/// Binary encoding: events are packed into a single binary instead of
-/// creating ~1,700 BEAM tuples per chunk. Elixir decodes one event at a
-/// time via binary pattern matching — only one event tuple is ever live.
+/// Two key optimizations for minimal NIF peak memory:
 ///
-/// Format:
+/// 1. **Zero-copy tokenization**: when the tail buffer is empty (common case),
+///    the BEAM binary is tokenized in-place — no 64 KB copy into Rust.
+/// 2. **Direct BEAM binary encoding**: events are written directly into an
+///    `OwnedBinary` via `BinaryWriter` — no intermediate Rust `Vec<u8>`.
+///
+/// Only the unprocessed tail (~100 bytes at a chunk boundary) is saved in
+/// the persistent buffer, which is shrunk to at most 1 KB after each call.
+///
+/// Combined NIF + BEAM peak is ~67 KB for a 2.93 MB document (64 KB chunks).
+///
+/// Binary format:
 ///   start_element: <<1, name_len::16, name, attr_count::16, [nlen::16, name, vlen::16, value]*>>
 ///   end_element:   <<2, name_len::16, name>>
 ///   characters:    <<3, text_len::32, text>>
@@ -1024,17 +1032,35 @@ fn streaming_feed_sax<'a>(
         .lock()
         .map_err(|_| rustler::Error::Term(Box::new(atoms::mutex_poisoned())))?;
 
-    inner.buffer.extend_from_slice(chunk.as_slice());
-
-    let boundary = find_safe_boundary(&inner.buffer);
-    if boundary == 0 {
-        return Ok(empty_binary(env));
+    // Zero-copy fast path: if the persistent buffer is empty (common case),
+    // tokenize directly from the BEAM binary without copying 64 KB into Rust.
+    // Only when there IS leftover tail bytes do we concatenate.
+    let had_tail = !inner.buffer.is_empty();
+    if had_tail {
+        inner.buffer.extend_from_slice(chunk.as_slice());
     }
 
-    let mut depth = inner.depth;
-    let mut buf: Vec<u8> = Vec::with_capacity(chunk.len());
-    {
-        let processable = &inner.buffer[..boundary];
+    // Scope all reads from `input` (which may alias inner.buffer) so the
+    // immutable borrow ends before we mutate inner.depth / inner.buffer.
+    let (depth, tail, buf) = {
+        let input: &[u8] = if had_tail {
+            &inner.buffer
+        } else {
+            chunk.as_slice()
+        };
+
+        let boundary = find_safe_boundary(input);
+        if boundary == 0 {
+            // Nothing processable yet — save everything as the tail.
+            if !had_tail {
+                inner.buffer.extend_from_slice(chunk.as_slice());
+            }
+            return Ok(empty_binary(env));
+        }
+
+        let mut depth = inner.depth;
+        let mut buf = BinaryWriter::new(chunk.len().max(256))?;
+        let processable = &input[..boundary];
         let mut tokenizer = Tokenizer::new(processable);
 
         while let Some(token) = tokenizer.next_token() {
@@ -1096,12 +1122,22 @@ fn streaming_feed_sax<'a>(
                 _ => {}
             }
         }
-    }
+
+        let tail = input[boundary..].to_vec();
+        (depth, tail, buf)
+    };
+    // immutable borrow of inner.buffer is now released.
 
     inner.depth = depth;
-    inner.buffer.drain(..boundary);
 
-    vec_to_binary(env, &buf)
+    // Save only the unprocessed tail (typically ~100 bytes).
+    inner.buffer.clear();
+    if !tail.is_empty() {
+        inner.buffer.extend_from_slice(&tail);
+    }
+    inner.buffer.shrink_to(1024);
+
+    buf.into_term(env)
 }
 
 /// Process remaining bytes in the buffer after all chunks have been fed.
@@ -1125,7 +1161,7 @@ fn streaming_finalize_sax<'a>(
 
     let remaining = std::mem::take(&mut inner.buffer);
     let mut depth = inner.depth;
-    let mut buf: Vec<u8> = Vec::new();
+    let mut buf = BinaryWriter::new(remaining.len().max(256))?;
     let mut tokenizer = Tokenizer::new(&remaining);
 
     while let Some(token) = tokenizer.next_token() {
@@ -1190,32 +1226,88 @@ fn streaming_finalize_sax<'a>(
 
     inner.depth = depth;
 
-    vec_to_binary(env, &buf)
+    buf.into_term(env)
+}
+
+// --- BinaryWriter: write directly into OwnedBinary ---
+
+/// Growable writer backed by an OwnedBinary (BEAM heap).
+///
+/// Events are encoded directly into the BEAM binary — no intermediate
+/// Rust Vec allocation. The binary is over-allocated with an estimate
+/// and trimmed to exact size before returning to the BEAM.
+struct BinaryWriter {
+    bin: rustler::OwnedBinary,
+    pos: usize,
+}
+
+impl BinaryWriter {
+    /// Allocate an OwnedBinary with `capacity` bytes.
+    fn new(capacity: usize) -> Result<Self, rustler::Error> {
+        let bin = rustler::OwnedBinary::new(capacity)
+            .ok_or_else(|| rustler::Error::Term(Box::new("alloc_failed")))?;
+        Ok(BinaryWriter { bin, pos: 0 })
+    }
+
+    /// Ensure at least `additional` bytes are available, reallocating if needed.
+    #[inline]
+    fn reserve(&mut self, additional: usize) {
+        let needed = self.pos + additional;
+        if needed > self.bin.len() {
+            // Double or jump to needed, whichever is larger.
+            let new_cap = std::cmp::max(self.bin.len() * 2, needed);
+            self.bin.realloc_or_copy(new_cap);
+        }
+    }
+
+    /// Append a single byte.
+    #[inline]
+    fn push(&mut self, byte: u8) {
+        self.reserve(1);
+        self.bin.as_mut_slice()[self.pos] = byte;
+        self.pos += 1;
+    }
+
+    /// Append a byte slice.
+    #[inline]
+    fn extend(&mut self, data: &[u8]) {
+        self.reserve(data.len());
+        self.bin.as_mut_slice()[self.pos..self.pos + data.len()].copy_from_slice(data);
+        self.pos += data.len();
+    }
+
+    /// Trim to written size and release as a BEAM binary term.
+    fn into_term<'a>(mut self, env: Env<'a>) -> NifResult<Term<'a>> {
+        if self.pos < self.bin.len() {
+            self.bin.realloc_or_copy(self.pos);
+        }
+        Ok(self.bin.release(env).encode(env))
+    }
 }
 
 // --- Binary encoding helpers ---
 
 /// Encode a name/short string: <<len::16, bytes>>
 #[inline]
-fn encode_bytes(buf: &mut Vec<u8>, data: &[u8]) {
-    buf.extend_from_slice(&(data.len() as u16).to_be_bytes());
-    buf.extend_from_slice(data);
+fn encode_bytes(buf: &mut BinaryWriter, data: &[u8]) {
+    buf.extend(&(data.len() as u16).to_be_bytes());
+    buf.extend(data);
 }
 
 /// Encode text content: <<len::32, bytes>>
 #[inline]
-fn encode_content(buf: &mut Vec<u8>, data: &[u8]) {
-    buf.extend_from_slice(&(data.len() as u32).to_be_bytes());
-    buf.extend_from_slice(data);
+fn encode_content(buf: &mut BinaryWriter, data: &[u8]) {
+    buf.extend(&(data.len() as u32).to_be_bytes());
+    buf.extend(data);
 }
 
 /// Encode attributes from a tag span into the buffer.
-fn encode_attrs(buf: &mut Vec<u8>, input: &[u8], span: (usize, usize)) {
+fn encode_attrs(buf: &mut BinaryWriter, input: &[u8], span: (usize, usize)) {
     use core::attributes::parse_attributes;
 
     let (start, end) = span;
     if end <= start || end > input.len() {
-        buf.extend_from_slice(&0u16.to_be_bytes());
+        buf.extend(&0u16.to_be_bytes());
         return;
     }
 
@@ -1245,25 +1337,16 @@ fn encode_attrs(buf: &mut Vec<u8>, input: &[u8], span: (usize, usize)) {
     }
 
     if pos >= attr_end {
-        buf.extend_from_slice(&0u16.to_be_bytes());
+        buf.extend(&0u16.to_be_bytes());
         return;
     }
 
     let attrs = parse_attributes(&tag_content[pos..attr_end]);
-    buf.extend_from_slice(&(attrs.len() as u16).to_be_bytes());
+    buf.extend(&(attrs.len() as u16).to_be_bytes());
     for attr in &attrs {
         encode_bytes(buf, attr.name.as_ref());
         encode_bytes(buf, attr.value.as_ref());
     }
-}
-
-/// Convert a Vec<u8> to a BEAM binary term.
-#[inline]
-fn vec_to_binary<'a>(env: Env<'a>, data: &[u8]) -> NifResult<Term<'a>> {
-    let mut owned = rustler::OwnedBinary::new(data.len())
-        .ok_or_else(|| rustler::Error::Term(Box::new("alloc_failed")))?;
-    owned.as_mut_slice().copy_from_slice(data);
-    Ok(owned.release(env).encode(env))
 }
 
 /// Return an empty BEAM binary.

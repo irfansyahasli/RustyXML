@@ -11,12 +11,15 @@ use std::sync::Mutex;
 // Streaming SAX Parser Resource
 // ============================================================================
 
-/// Lightweight streaming SAX parser — just a buffer and depth counter.
+/// Lightweight streaming SAX parser — just a tail buffer and depth counter.
 ///
-/// Combined with `streaming_feed_sax` NIF: feed chunk → tokenize → encode
-/// events into a compact binary → drain buffer. The binary crosses the NIF
-/// boundary as a single allocation; Elixir decodes one event at a time via
-/// pattern matching so only one event tuple is ever live on the BEAM heap.
+/// Combined with `streaming_feed_sax` NIF: on the common-case path (buffer
+/// empty), the NIF tokenizes the BEAM binary in-place — zero copy. Events
+/// are written directly into an OwnedBinary on the BEAM heap via
+/// `BinaryWriter`, eliminating the intermediate Rust Vec allocation. Only
+/// the unprocessed tail (typically ~100 bytes at a chunk boundary) is saved
+/// in `buffer`. The initial capacity is 1 KB, and it is shrunk after each
+/// call to avoid retaining excess memory.
 pub struct StreamingSaxParser {
     pub buffer: Vec<u8>,
     pub depth: u32,
@@ -25,7 +28,7 @@ pub struct StreamingSaxParser {
 impl StreamingSaxParser {
     pub fn new() -> Self {
         StreamingSaxParser {
-            buffer: Vec::with_capacity(64 * 1024),
+            buffer: Vec::with_capacity(1024),
             depth: 0,
         }
     }

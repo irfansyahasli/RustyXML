@@ -419,9 +419,10 @@ defmodule RustyXML.Native do
   @doc """
   Feed a chunk and return SAX events as a compact binary.
 
-  Events are binary-encoded instead of creating BEAM tuples in the NIF.
-  Elixir decodes one event at a time via pattern matching — only one event
-  tuple is ever live on the heap (matching Saxy's inline-handler profile).
+  When the tail buffer is empty (common case), the NIF tokenizes the BEAM
+  binary in-place (zero copy) and writes events directly into an OwnedBinary
+  on the BEAM heap — no intermediate Rust Vec allocation. Only the
+  unprocessed tail (~100 bytes) is saved between calls.
 
   Format: sequence of `<<type::8, ...>>` where type 1=start, 2=end, 3=chars, 4=cdata.
   """
